@@ -26,7 +26,8 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT")
 MODEL_MAX_TOKENS = int(os.getenv("MODEL_MAX_TOKENS", 2048))
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
-WEBHOOK_URL = os.getenv("WEBHOOK_BASE", "https://your.domain") + WEBHOOK_PATH
+WEBHOOK_BASE = os.getenv("WEBHOOK_BASE")
+WEBHOOK_URL = WEBHOOK_BASE + WEBHOOK_PATH if WEBHOOK_BASE else None
 
 # === SETUP ===
 # Настройка логгирования и компонентов бота
@@ -88,6 +89,7 @@ async def cmd_start(message: Message):
 
 @dp.message()
 async def handle_message(message: Message):
+    logging.info(f"Входящее сообщение от {message.chat.id}: {message.text}")
     """Основной обработчик сообщений"""
     chat_id = message.chat.id
     user_input = message.text.strip()
@@ -117,25 +119,31 @@ async def handle_message(message: Message):
 
     # Сохраняем и отправляем ответ
     chat_history[chat_id].append(f"Бот: {reply}")
+    logging.info(f"Ответ пользователю {chat_id}: {reply}")
     await message.answer(reply)
 
 # === WEBHOOK SETUP ===
 async def on_startup(app):
-    """Устанавливаем webhook при запуске приложения"""
-    await bot.set_webhook(WEBHOOK_URL)
+    """Устанавливаем webhook при запуске приложения, если указан"""
+    if WEBHOOK_URL:
+        await bot.set_webhook(WEBHOOK_URL)
+    else:
+        logging.warning("WEBHOOK_URL не указан. Вебхук не будет установлен.")
 
 async def on_shutdown(app):
-    """Удаляем webhook при завершении работы"""
-    await bot.delete_webhook()
+    """Удаляем webhook при завершении работы, если он был установлен"""
+    if WEBHOOK_URL:
+        await bot.delete_webhook()
 
 # Создаём и запускаем aiohttp-приложение
 app = web.Application()
 app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
 
-# Подключаем бота к webhook через SimpleRequestHandler
-SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
-setup_application(app, dp, bot=bot)
+# Подключаем бота к webhook через SimpleRequestHandler, если задан
+if WEBHOOK_URL:
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    setup_application(app, dp, bot=bot)
 
 # Запуск веб-сервера
 if __name__ == "__main__":
