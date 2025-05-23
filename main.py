@@ -1,20 +1,21 @@
 import logging
-import requests
-import tiktoken
-from aiogram import Bot, Dispatcher, types
-from aiogram.types import Message
-from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-from aiohttp import web
-from sentence_transformers import SentenceTransformer
-from sklearn.neighbors import NearestNeighbors
 import os
 import time
-
 # === LOAD ENV ===
 # Загружаем переменные окружения из .env файла, если он существует
 from pathlib import Path
+
+import requests
+import tiktoken
+from aiogram import Bot, Dispatcher, types
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import Message
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
+from sklearn.neighbors import NearestNeighbors
+from aiogram.enums import ChatAction
 
 env_path = Path('.') / '.env'
 if env_path.exists():
@@ -100,7 +101,7 @@ def run_llm(prompt):
         response.raise_for_status()
         run_id = response.json().get("id")
         if not run_id:
-            return "[Ошибка: не получен идентификатор задачи RunPod]"
+            return "[Ой! Кажется, у меня техническая проблема под кодовым именем Арбузик]"
 
         # Ожидание завершения задачи
         status_url = f"{RUNPOD_ENDPOINT}/status/{run_id}"
@@ -109,19 +110,20 @@ def run_llm(prompt):
             status_resp.raise_for_status()
             data = status_resp.json()
             if data.get("status") == "COMPLETED":
-                return data.get("output", "[Ошибка: пустой вывод]")
+                return data.get("output", "[Ой! Кажется, у меня техническая проблема под кодовым именем Клубничка]")
             elif data.get("status") == "FAILED":
-                return f"[Ошибка: задача завершилась с ошибкой: {data}]"
+                logging.error(f"Ошибка выполнения задачи: {data}")
+                return f"[Ой! Кажется, у меня техническая проблема под кодовым именем Абрикосик]"
             time.sleep(1)
 
-        return "[Ошибка: превышено время ожидания ответа от RunPod]"
+        return "[Ой! Кажется, у меня техническая проблема под кодовым именем Сливка]"
 
     except requests.exceptions.RequestException as e:
         logging.error(f"Ошибка при обращении к RunPod: {e}")
-        return f"[Ошибка запроса: {e}]"
+        return f"[Ой! Кажется, у меня техническая проблема под кодовым именем Персик]"
     except ValueError:
         logging.error("Ошибка разбора JSON-ответа от RunPod")
-        return "[Ошибка: RunPod не вернул корректный JSON]"
+        return "[Ой! Кажется, у меня техническая проблема под кодовым именем Вишенка]"
 
 # === ОБРАБОТКА СООБЩЕНИЙ ===
 @dp.message()
@@ -135,6 +137,8 @@ async def handle_message(message: Message):
         chat_history[chat_id] = []
         await message.answer("Привет, я Ника! А тебя как зовут?")
         return
+
+    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
     if chat_id not in chat_history:
         chat_history[chat_id] = []
