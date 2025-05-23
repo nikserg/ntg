@@ -35,9 +35,10 @@ logging.basicConfig(
 # Считывание всех параметров из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT")
-CONTEXT_LENGTH = int(os.getenv("CONTEXT_LENGTH", 8192))
-CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 1536))
+CONTEXT_LENGTH = int(os.getenv("CONTEXT_LENGTH", 4096))
+CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 2500))
 MAX_HISTORY_SIZE = int(os.getenv("MAX_HISTORY_SIZE", 1000))
+RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
 CHARACTER_CARD = os.getenv("CHARACTER_CARD",
                            "Name: Ника\nPersonality: Игривая, кокетливая, милая, немного дерзкая\nAppearance: Розовые волосы, пронзительные зелёные глаза, кружевной чокер")
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
@@ -68,6 +69,7 @@ logging.info(f"Настройки бота:\n"
              f"TOP_P: {TOP_P}\n"
              f"REPEAT_PENALTY: {REPEAT_PENALTY}\n"
              f"REPLY_MAX_TOKENS: {REPLY_MAX_TOKENS}\n"
+             f"RUNPOD_API_KEY: {RUNPOD_API_KEY}\n"
              )
 
 # Комбинированный промпт для LLM
@@ -134,7 +136,10 @@ async def run_llm(prompt):
     logging.info(f"Отправка запроса к LLM: {payload}")
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(RUNPOD_ENDPOINT + "/run", json=payload, timeout=30) as response:
+            headers = {
+                "Authorization": f"Bearer {os.getenv('RUNPOD_API_KEY')}"
+            }
+            async with session.post(RUNPOD_ENDPOINT + "/run", json=payload, headers=headers, timeout=30) as response:
                 response.raise_for_status()
                 data = await response.json()
                 run_id = data.get("id")
