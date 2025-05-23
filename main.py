@@ -137,6 +137,7 @@ async def handle_message(message: Message):
 async def on_startup(app):
     """Устанавливает webhook при запуске, если он задан"""
     if WEBHOOK_URL:
+        logging.info(f"Установка вебхука на {WEBHOOK_URL}")
         await bot.set_webhook(WEBHOOK_URL)
     else:
         logging.warning("WEBHOOK_URL не указан. Вебхук не будет установлен.")
