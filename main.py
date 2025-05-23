@@ -11,7 +11,7 @@ from sklearn.neighbors import NearestNeighbors
 import os
 
 # === LOAD ENV ===
-# Загружаем переменные окружения из .env, если файл существует
+# Загружаем переменные окружения из .env файла (если он существует)
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -19,7 +19,7 @@ env_path = Path('.') / '.env'
 if env_path.exists():
     load_dotenv(dotenv_path=env_path)
 
-# Настройки логирования, чтобы видеть логи в консоли
+# Настройка логирования — выводит информацию в консоль
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -27,10 +27,10 @@ logging.basicConfig(
 )
 
 # === CONFIG ===
-# Настройки, считываемые из переменных окружения
+# Получаем конфигурационные значения из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT")
-MODEL_MAX_TOKENS = int(os.getenv("MODEL_MAX_TOKENS", 2048))
+MODEL_MAX_TOKENS = int(os.getenv("MODEL_MAX_TOKENS", 8192))
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
 WEBHOOK_BASE = os.getenv("WEBHOOK_BASE")
 WEBHOOK_URL = WEBHOOK_BASE + WEBHOOK_PATH if WEBHOOK_BASE else None
@@ -38,7 +38,7 @@ SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", "Ника — дружелюбный 
 TEMPERATURE = float(os.getenv("TEMPERATURE", 0.7))
 MIN_P = float(os.getenv("MIN_P", 0.1))
 
-# Выводим в лог информацию о конфигурации
+# Логируем конфигурацию
 logging.info(f"Telegram Token: {TELEGRAM_TOKEN}")
 logging.info(f"Runpod Endpoint: {RUNPOD_ENDPOINT}")
 logging.info(f"Model Max Tokens: {MODEL_MAX_TOKENS}")
@@ -49,24 +49,23 @@ logging.info(f"Temperature: {TEMPERATURE}")
 logging.info(f"Min P: {MIN_P}")
 
 # === SETUP ===
-# Инициализация бота, диспетчера и хранилищ
-logging.basicConfig(level=logging.INFO)
+# Инициализация Telegram-бота, хранилища и диспетчера
 bot = Bot(token=TELEGRAM_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# Токенизатор и модель для эмбеддингов
+# Подгружаем токенизатор и модель SentenceTransformer для эмбеддингов
 tokenizer = tiktoken.get_encoding("cl100k_base")
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Векторные базы для каждого чата
+# Словари для хранения истории чата и эмбеддингов
 vector_store = {}
 vector_embeddings = {}
 chat_history = {}
 
 # === HELPERS ===
 def truncate_history(messages, max_tokens):
-    """Обрезает историю сообщений так, чтобы не превышать лимит по токенам"""
+    # Обрезает историю сообщений, чтобы вписаться в лимит токенов
     total = 0
     kept = []
     for msg in reversed(messages):
@@ -78,11 +77,11 @@ def truncate_history(messages, max_tokens):
     return list(reversed(kept))
 
 def embed_text(text):
-    """Создаёт эмбеддинг из текста для векторного поиска"""
+    # Создаёт эмбеддинг из текста
     return embedder.encode([text])[0].astype("float32")
 
 def find_similar(text, chat_id, top_k=3):
-    """Находит релевантные сообщения пользователя по векторному сходству"""
+    # Находит похожие сообщения из прошлого по векторному сходству
     if chat_id not in vector_embeddings or not vector_embeddings[chat_id]:
         return []
     vec = embed_text(text).reshape(1, -1)
@@ -92,7 +91,7 @@ def find_similar(text, chat_id, top_k=3):
     return [vector_store[chat_id][i] for i in indices[0]]
 
 def run_llm(prompt):
-    """Отправляет prompt к LLM и возвращает ответ"""
+    # Отправляет промпт на Runpod и возвращает ответ модели
     payload = {
         "input": {
             "prompt": f"{SYSTEM_PROMPT}\n\n{prompt}",
@@ -105,26 +104,24 @@ def run_llm(prompt):
     try:
         return response.json()["output"]
     except Exception:
-        return "[Ошибка: LLM не ответила корректно]"
+        return "[Ошибка: модель не вернула корректный ответ]"
 
 # === HANDLERS ===
 @dp.message()
-async def cmd_start(message: Message):
-    """Обработка команды /start (отфильтрована вручную)"""
-    if message.text != "/start":
-        return
-    logging.info(f"Команда /start от {message.chat.id}")
-    chat_history[message.chat.id] = []
-    await message.answer("Привет, я Ника! А тебя как зовут? Напиши мне своё имя, и я запомню его на всю беседу.")
-
-@dp.message()
 async def handle_message(message: Message):
-    """Обрабатывает все входящие сообщения пользователей"""
+    # Обрабатывает все входящие сообщения Telegram
     logging.info(f"Входящее сообщение от {message.chat.id}: {message.text}")
     chat_id = message.chat.id
     user_input = message.text.strip()
 
-    # Инициализируем историю и векторные хранилища при первом сообщении
+    # Обработка команды /start
+    if user_input == "/start":
+        logging.info(f"Команда /start от {chat_id}")
+        chat_history[chat_id] = []
+        await message.answer("Привет, я Ника! А тебя как зовут?")
+        return
+
+    # Инициализация истории и эмбеддингов, если пользователь новый
     if chat_id not in chat_history:
         chat_history[chat_id] = []
     if chat_id not in vector_store:
@@ -137,22 +134,22 @@ async def handle_message(message: Message):
     vector_store[chat_id].append(user_input)
     vector_embeddings[chat_id].append(emb)
 
-    # Находим релевантные прошлые сообщения и обрезаем историю
+    # Ищем релевантные воспоминания и формируем историю
     memories = find_similar(user_input, chat_id)
     history = truncate_history(chat_history[chat_id], MODEL_MAX_TOKENS - 256)
 
-    # Формируем финальный prompt и запрашиваем LLM
+    # Генерация ответа от модели
     prompt = "\n".join(memories + history + ["Ника:"])
     reply = run_llm(prompt)
 
-    # Добавляем ответ в историю и отправляем пользователю
+    # Сохраняем ответ и отправляем пользователю
     chat_history[chat_id].append(f"Ника: {reply}")
     logging.info(f"Ответ пользователю {chat_id}: {reply}")
     await message.answer(reply)
 
 # === WEBHOOK SETUP ===
 async def on_startup(app):
-    """Устанавливает webhook при запуске, если он задан"""
+    # Устанавливаем webhook при запуске сервера
     if WEBHOOK_URL:
         logging.info(f"Установка вебхука на {WEBHOOK_URL}")
         await bot.set_webhook(WEBHOOK_URL)
@@ -160,11 +157,11 @@ async def on_startup(app):
         logging.warning("WEBHOOK_URL не указан. Вебхук не будет установлен.")
 
 async def on_shutdown(app):
-    """Удаляет webhook при завершении работы, если он был установлен"""
+    # Удаляем webhook при завершении работы
     if WEBHOOK_URL:
         await bot.delete_webhook()
 
-# Инициализация и запуск aiohttp-приложения
+# Настройка aiohttp-приложения и регистрация webhook
 app = web.Application()
 app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
@@ -173,5 +170,6 @@ if WEBHOOK_URL:
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
+# Запуск aiohttp-приложения
 if __name__ == "__main__":
     web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
