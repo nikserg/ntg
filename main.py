@@ -108,13 +108,16 @@ def embed_text(text):
 
 
 def find_similar(text, chat_id, top_k=3):
-    # Ищет похожие сообщения по векторной близости
+    # Находит похожие сообщения в векторном хранилище
     if chat_id not in vector_embeddings or not vector_embeddings[chat_id]:
         return []
+    if len(vector_embeddings[chat_id]) < 1:
+        return []
     vec = embed_text(text).reshape(1, -1)
-    index = NearestNeighbors(n_neighbors=top_k, algorithm='auto', metric='euclidean')
+    n_neighbors = min(top_k, len(vector_embeddings[chat_id]))
+    index = NearestNeighbors(n_neighbors=n_neighbors, algorithm='auto', metric='euclidean')
     index.fit(vector_embeddings[chat_id])
-    distances, indices = index.kneighbors(vec, n_neighbors=min(top_k, len(vector_embeddings[chat_id])))
+    distances, indices = index.kneighbors(vec, n_neighbors=n_neighbors)
     return [vector_store[chat_id][i] for i in indices[0]]
 
 
