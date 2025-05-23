@@ -19,6 +19,13 @@ env_path = Path('.') / '.env'
 if env_path.exists():
     load_dotenv(dotenv_path=env_path)
 
+# Настройки логирования, чтобы видеть логи в консоли
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+
 # === CONFIG ===
 # Настройки, считываемые из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -30,6 +37,16 @@ WEBHOOK_URL = WEBHOOK_BASE + WEBHOOK_PATH if WEBHOOK_BASE else None
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", "Ника — дружелюбный и немного игривый ИИ-собеседник.")
 TEMPERATURE = float(os.getenv("TEMPERATURE", 0.7))
 MIN_P = float(os.getenv("MIN_P", 0.1))
+
+# Выводим в лог информацию о конфигурации
+logging.info(f"Telegram Token: {TELEGRAM_TOKEN}")
+logging.info(f"Runpod Endpoint: {RUNPOD_ENDPOINT}")
+logging.info(f"Model Max Tokens: {MODEL_MAX_TOKENS}")
+logging.info(f"Webhook URL: {WEBHOOK_URL}")
+logging.info(f"Webhook Base: {WEBHOOK_BASE}")
+logging.info(f"System Prompt: {SYSTEM_PROMPT}")
+logging.info(f"Temperature: {TEMPERATURE}")
+logging.info(f"Min P: {MIN_P}")
 
 # === SETUP ===
 # Инициализация бота, диспетчера и хранилищ
