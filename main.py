@@ -8,7 +8,6 @@ import asyncio
 # Загружаем переменные окружения из .env файла, если он существует
 from pathlib import Path
 
-import requests
 import tiktoken
 from aiogram import Bot, Dispatcher, types
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -137,7 +136,9 @@ async def run_llm(prompt):
     try:
         async with aiohttp.ClientSession() as session:
             headers = {
-                "Authorization": f"Bearer {os.getenv('RUNPOD_API_KEY')}"
+                "Authorization": f"{os.getenv('RUNPOD_API_KEY')}",
+                "Content-Type": "application/json",
+                "Accept": "application/json"
             }
             async with session.post(RUNPOD_ENDPOINT + "/run", json=payload, headers=headers, timeout=30) as response:
                 response.raise_for_status()
