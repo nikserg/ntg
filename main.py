@@ -114,7 +114,7 @@ def find_similar(text, chat_id, top_k=3):
         return []
     vec = embed_text(text).reshape(1, -1)
     n_neighbors = min(top_k, len(vector_embeddings[chat_id]))
-    index = NearestNeighbors(n_neighbors=n_neighbors, algorithm='auto', metric='euclidean')
+    index = NearestNeighbors(n_neighbors=n_neighbors, algorithm='auto', metric='cosine')
     index.fit(vector_embeddings[chat_id])
     distances, indices = index.kneighbors(vec, n_neighbors=n_neighbors)
     return [vector_store[chat_id][i] for i in indices[0]]
@@ -178,14 +178,14 @@ async def handle_message(message: Message):
 
     if user_input == "/start":
         logging.info(f"Команда /start от {chat_id}")
-        chat_history[chat_id] = []
-        await message.answer(FIRST_MESSAGE)
+        chat_history[chat_id] = [f"Ника: {FIRST_MESSAGE.replace('\\n', '\n')}"]
+        await message.answer(FIRST_MESSAGE.replace("\\n", "\n"))
         return
 
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
     if chat_id not in chat_history:
-        chat_history[chat_id] = []
+        chat_history[chat_id] = [f"Ника: {FIRST_MESSAGE.replace('\\n', '\n')}"]
     if chat_id not in vector_store:
         vector_store[chat_id] = []
         vector_embeddings[chat_id] = []
