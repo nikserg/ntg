@@ -30,15 +30,15 @@ logging.basicConfig(
 
 # === КОНФИГУРАЦИЯ ===
 # Считывание всех параметров из переменных окружения
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
+RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT", "")
 CONTEXT_LENGTH = int(os.getenv("CONTEXT_LENGTH", 4096))
 CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 2500))
 MAX_HISTORY_SIZE = int(os.getenv("MAX_HISTORY_SIZE", 1000))
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
 CHARACTER_CARD = os.getenv("CHARACTER_CARD", "Имя: Ника\nЛичность: Доброжелательная, отзывчивая, умная\n")
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
-WEBHOOK_BASE = os.getenv("WEBHOOK_BASE")
+WEBHOOK_BASE = os.getenv("WEBHOOK_BASE", "")
 WEBHOOK_URL = WEBHOOK_BASE + WEBHOOK_PATH if WEBHOOK_BASE else None
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", "Ты виртуальный помощник, который помогает пользователям с их вопросами и задачами. Ты дружелюбный и отзывчивый.")
 FIRST_MESSAGE = os.getenv("FIRST_MESSAGE", "Привет, я Ника! А тебя как зовут?")
@@ -72,10 +72,16 @@ logging.info(f"Настройки бота:\n"
 full_system_prompt = f"{SYSTEM_PROMPT}\n{CHARACTER_CARD}"
 
 # === ИНИЦИАЛИЗАЦИЯ ===
-bot = Bot(token=TELEGRAM_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
-
+# Создаём бота только если есть токен
+if TELEGRAM_TOKEN:
+    bot = Bot(token=TELEGRAM_TOKEN)
+    storage = MemoryStorage()
+    dp = Dispatcher(storage=storage)
+else:
+    logging.info("TELEGRAM_TOKEN не указан. Бот не будет запущен.")
+    bot = None
+    storage = None
+    dp = None
 tokenizer = tiktoken.get_encoding("cl100k_base")
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -199,6 +205,9 @@ def build_prompt(memories, history):
 # === ОБРАБОТКА СООБЩЕНИЙ ===
 @dp.message()
 async def handle_message(message: Message):
+    # Выходим, если бот не инициализирован (для тестов)
+    if not bot:
+        return
     logging.info(f"Входящее сообщение от {message.chat.id}: {message.text}")
     chat_id = message.chat.id
     user_input = message.text.strip()
