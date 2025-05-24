@@ -103,6 +103,103 @@ async def test_run_llm_success():
 
 
 @pytest.mark.asyncio
+async def test_run_llm_in_progress_completed():
+    """Тестирует сценарий, когда RunPod сначала возвращает IN_PROGRESS, а затем COMPLETED"""
+    # Первый ответ со статусом IN_PROGRESS
+    in_progress_response = {
+        "delayTime": 46842,
+        "id": "sync-task-id",
+        "status": "IN_PROGRESS",
+        "workerId": "worker123"
+    }
+
+    # Второй ответ со статусом COMPLETED
+    completed_response = {
+        "status": "COMPLETED",
+        "output": {"text": "успешный ответ"}
+    }
+
+    # Моки для первого запроса (runsync)
+    first_response = AsyncMock()
+    first_response.json = AsyncMock(return_value=in_progress_response)
+    first_response.raise_for_status = MagicMock()
+
+    first_post_context = AsyncMock()
+    first_post_context.__aenter__ = AsyncMock(return_value=first_response)
+    first_post_context.__aexit__ = AsyncMock(return_value=None)
+
+    # Моки для второго запроса (status)
+    second_response = AsyncMock()
+    second_response.json = AsyncMock(return_value=completed_response)
+
+    second_get_context = AsyncMock()
+    second_get_context.__aenter__ = AsyncMock(return_value=second_response)
+    second_get_context.__aexit__ = AsyncMock(return_value=None)
+
+    session = AsyncMock()
+    session.post = MagicMock(return_value=first_post_context)
+    session.get = MagicMock(return_value=second_get_context)
+
+    client_cm = AsyncMock()
+    client_cm.__aenter__ = AsyncMock(return_value=session)
+    client_cm.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("aiohttp.ClientSession", return_value=client_cm), \
+            patch("asyncio.sleep", AsyncMock()):  # Мокаем sleep чтобы тест не ждал
+        result = await main.run_llm("промпт")
+        assert result == "успешный ответ"
+        assert session.get.call_count > 0  # Проверяем, что был запрос статуса
+
+
+@pytest.mark.asyncio
+async def test_run_llm_in_progress_failed():
+    """Тестирует сценарий, когда RunPod сначала возвращает IN_PROGRESS, а затем FAILED"""
+    # Первый ответ со статусом IN_PROGRESS
+    in_progress_response = {
+        "delayTime": 46842,
+        "id": "sync-task-id",
+        "status": "IN_PROGRESS",
+        "workerId": "worker123"
+    }
+
+    # Второй ответ со статусом FAILED
+    failed_response = {
+        "status": "FAILED",
+        "error": "что-то пошло не так"
+    }
+
+    # Моки для первого запроса (runsync)
+    first_response = AsyncMock()
+    first_response.json = AsyncMock(return_value=in_progress_response)
+    first_response.raise_for_status = MagicMock()
+
+    first_post_context = AsyncMock()
+    first_post_context.__aenter__ = AsyncMock(return_value=first_response)
+    first_post_context.__aexit__ = AsyncMock(return_value=None)
+
+    # Моки для второго запроса (status)
+    second_response = AsyncMock()
+    second_response.json = AsyncMock(return_value=failed_response)
+
+    second_get_context = AsyncMock()
+    second_get_context.__aenter__ = AsyncMock(return_value=second_response)
+    second_get_context.__aexit__ = AsyncMock(return_value=None)
+
+    session = AsyncMock()
+    session.post = MagicMock(return_value=first_post_context)
+    session.get = MagicMock(return_value=second_get_context)
+
+    client_cm = AsyncMock()
+    client_cm.__aenter__ = AsyncMock(return_value=session)
+    client_cm.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("aiohttp.ClientSession", return_value=client_cm), \
+            patch("asyncio.sleep", AsyncMock()):
+        result = await main.run_llm("промпт")
+        assert "Апельсин" in result  # Проверяем кодовое слово в сообщении об ошибке
+        assert session.get.call_count > 0
+
+@pytest.mark.asyncio
 async def test_run_llm_error():
     # Правильно создаем моки для асинхронного контекстного менеджера
     post_ctx = AsyncMock()

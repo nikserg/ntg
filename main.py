@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import re
@@ -178,6 +179,42 @@ async def run_llm(prompt):
             async with session.post(RUNPOD_ENDPOINT + "/runsync", json=payload, headers=headers, timeout=240) as response:
                 response.raise_for_status()
                 data = await response.json()
+                # Проверяем, не вернулся ли статус IN_PROGRESS
+                if data.get("status") == "IN_PROGRESS" and data.get("id"):
+                    task_id = data.get("id")
+                    logging.info(f"Получен статус IN_PROGRESS, id задачи: {task_id}")
+
+                    # Ждем завершения задачи
+                    max_attempts = 120
+                    attempts = 0
+
+                    while attempts < max_attempts:
+                        await asyncio.sleep(1)
+                        attempts += 1
+
+                        async with session.get(f"{RUNPOD_ENDPOINT}/status/{task_id}",
+                                               headers=headers) as status_response:
+                            status_data = await status_response.json()
+                            status = status_data.get("status")
+
+                            if status == "COMPLETED":
+                                output = status_data.get("output", {})
+                                text = output.get("text")
+                                if text is None:
+                                    logging.error(f"Ответ LLM без текста: {status_data}")
+                                    return "[Ой! Кажется, у меня техническая проблема под кодовым именем Клубничка]"
+                                return text
+
+                            elif status == "FAILED":
+                                logging.info(f"Задача завершилась с ошибкой: {status_data}")
+                                return "[Ой! Кажется, у меня техническая проблема под кодовым именем Апельсин]"
+
+                            # Иначе продолжаем ожидание
+
+                    logging.error(f"Превышено время ожидания для задачи {task_id}")
+                    return "[Ой! Кажется, у меня техническая проблема под кодовым именем Лимон]"
+
+                # Обычная обработка для случая немедленного ответа
                 output = data.get("output", {})
                 text = output.get("text")
                 if text is None:
