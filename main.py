@@ -88,6 +88,14 @@ chat_history = {}
 
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+def trim_incomplete_sentence(text):
+    # Находит последнее завершённое предложение
+    match = re.search(r'([.!?…])[^.!?…]*$', text)
+    if match:
+        end = match.end(1)
+        return text[:end].strip()
+    return text.strip()
+
 def truncate_history(messages, max_tokens):
     # Сокращает историю сообщений по лимиту токенов
     total = 0
@@ -205,6 +213,7 @@ async def handle_message(message: Message):
 
     prompt = build_prompt(memories, history)
     reply = await run_llm(prompt)
+    reply = trim_incomplete_sentence(reply)
 
     chat_history[chat_id].append(f"Ника: {reply}")
     logging.info(f"Ответ пользователю {chat_id}: {reply}")
