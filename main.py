@@ -1,8 +1,7 @@
 import logging
 import os
-import time
 import aiohttp
-import asyncio
+import re
 
 # === LOAD ENV ===
 # Загружаем переменные окружения из .env файла, если он существует
