@@ -49,6 +49,8 @@ def test_find_similar_empty():
     main.vector_embeddings[chat_id] = []
     main.vector_store[chat_id] = []
     assert main.find_similar("тест", chat_id) == []
+    # Проверка с непустым контекстом
+    assert main.find_similar("тест", chat_id, current_context=["сообщение"]) == []
 
 
 def test_find_similar_found():
@@ -64,6 +66,29 @@ def test_find_similar_found():
             result = main.find_similar("тест", chat_id, top_k=2)
             assert result == ["msg1", "msg2"]
 
+
+def test_find_similar_with_context_filter():
+    chat_id = 789
+    emb = np.ones(384, dtype="float32")
+    main.vector_embeddings[chat_id] = [emb, emb, emb]
+    main.vector_store[chat_id] = ["msg1", "msg2", "msg3"]
+    with patch("main.embed_text", return_value=emb):
+        with patch("main.NearestNeighbors") as nn_mock:
+            nn = nn_mock.return_value
+            nn.kneighbors.return_value = (np.array([[0.1, 0.2, 0.3]]), np.array([[0, 1, 2]]))
+            nn.fit.return_value = None
+
+            # Без фильтрации контекста
+            result = main.find_similar("тест", chat_id, top_k=3)
+            assert result == ["msg1", "msg2", "msg3"]
+
+            # С фильтрацией контекста
+            result = main.find_similar("тест", chat_id, current_context=["msg1"], top_k=3)
+            assert result == ["msg2", "msg3"]
+
+            # С фильтрацией нескольких сообщений
+            result = main.find_similar("тест", chat_id, current_context=["msg1", "msg3"], top_k=3)
+            assert result == ["msg2"]
 
 def test_build_prompt():
     memories = ["было так", "ещё вот так"]

@@ -142,21 +142,37 @@ def truncate_history(messages, max_tokens):
 
 def embed_text(text):
     # Генерирует эмбеддинг текста
-    return embedder.encode([text])[0].astype("float32")
+    return embedder.encode([text], show_progress_bar=False)[0].astype("float32")
 
 
-def find_similar(text, chat_id, top_k=3):
-    # Находит похожие сообщения в векторном хранилище
+def find_similar(text, chat_id, current_context=None, top_k=3):
+    # Находит похожие сообщения в векторном хранилище, исключая те, что уже есть в контексте
     if chat_id not in vector_embeddings or not vector_embeddings[chat_id]:
         return []
     if len(vector_embeddings[chat_id]) < 1:
         return []
+
+    # Установим current_context в пустой список, если он не передан
+    if current_context is None:
+        current_context = []
+
     vec = embed_text(text).reshape(1, -1)
-    n_neighbors = min(top_k, len(vector_embeddings[chat_id]))
+    n_neighbors = min(top_k * 3, len(vector_embeddings[chat_id]))  # Берем больше соседей с запасом для фильтрации
+
     index = NearestNeighbors(n_neighbors=n_neighbors, algorithm='auto', metric='cosine')
     index.fit(vector_embeddings[chat_id])
     distances, indices = index.kneighbors(vec, n_neighbors=n_neighbors)
-    return [vector_store[chat_id][i] for i in indices[0]]
+
+    # Фильтрация результатов: исключаем сообщения, которые уже есть в контексте
+    similar_msgs = []
+    for i in indices[0]:
+        candidate = vector_store[chat_id][i]
+        if candidate not in current_context:
+            similar_msgs.append(candidate)
+            if len(similar_msgs) >= top_k:
+                break
+
+    return similar_msgs
 
 
 async def run_llm(prompt):
@@ -279,8 +295,10 @@ async def handle_message(message: Message):
         vector_store[chat_id] = vector_store[chat_id][-MAX_HISTORY_SIZE:]
         vector_embeddings[chat_id] = vector_embeddings[chat_id][-MAX_HISTORY_SIZE:]
 
-    memories = find_similar(cleaned_input, chat_id)
+    # Сначала получаем историю
     history = truncate_history(chat_history[chat_id], CONTEXT_TOKEN_LIMIT)
+    # Затем находим похожие сообщения, исключая те, что уже в контексте
+    memories = find_similar(cleaned_input, chat_id, current_context=history)
 
     prompt = build_prompt(memories, history)
     reply = await run_llm(prompt)
