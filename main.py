@@ -135,40 +135,21 @@ async def run_llm(prompt):
             }
         }
     }
-    logging.info(f"Отправка запроса к LLM: {payload}")
+    logging.info(f"Отправка запроса к LLM (runsync): {payload}")
     try:
         async with aiohttp.ClientSession() as session:
             headers = {
-                "Authorization": f"{os.getenv('RUNPOD_API_KEY')}",
+                "Authorization": f"Bearer {RUNPOD_API_KEY}",
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             }
-            async with session.post(RUNPOD_ENDPOINT + "/run", json=payload, headers=headers, timeout=30) as response:
+            async with session.post(RUNPOD_ENDPOINT + "/runsync", json=payload, headers=headers, timeout=120) as response:
                 response.raise_for_status()
                 data = await response.json()
-                run_id = data.get("id")
-                if not run_id:
-                    logging.error("Не удалось получить ID задачи из ответа RunPod")
-                    return "[Ой! Кажется, у меня техническая проблема под кодовым именем Арбузик]"
-
-            status_url = f"{RUNPOD_ENDPOINT}/status/{run_id}"
-            for _ in range(120):
-                async with session.get(status_url) as status_resp:
-                    status_resp.raise_for_status()
-                    data = await status_resp.json()
-                    if data.get("status") == "COMPLETED":
-                        return data.get("output",
-                                        "[Ой! Кажется, у меня техническая проблема под кодовым именем Клубничка]")
-                    elif data.get("status") == "FAILED":
-                        logging.error(f"Ошибка выполнения задачи: {data}")
-                        return f"[Ой! Кажется, у меня техническая проблема под кодовым именем Абрикосик]"
-                await asyncio.sleep(1)
-
-            return "[Ой! Кажется, у меня техническая проблема под кодовым именем Сливка]"
-
+                return data.get("output", {}).get("text", "[Ой! Кажется, у меня техническая проблема под кодовым именем Клубничка]")
     except Exception as e:
         logging.error(f"Ошибка при обращении к RunPod: {e}")
-        return f"[Ой! Кажется, у меня техническая проблема под кодовым именем Персик]"
+        return "[Ой! Кажется, у меня техническая проблема под кодовым именем Персик]"
 
 
 # === ОБРАБОТКА СООБЩЕНИЙ ===
