@@ -38,13 +38,12 @@ CONTEXT_LENGTH = int(os.getenv("CONTEXT_LENGTH", 4096))
 CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 2500))
 MAX_HISTORY_SIZE = int(os.getenv("MAX_HISTORY_SIZE", 1000))
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
-CHARACTER_CARD = os.getenv("CHARACTER_CARD",
-                           "Name: Ника\nPersonality: Игривая, кокетливая, милая, немного дерзкая\nAppearance: Розовые волосы, пронзительные зелёные глаза, кружевной чокер")
+CHARACTER_CARD = os.getenv("CHARACTER_CARD", "Имя: Ника\nЛичность: Доброжелательная, отзывчивая, умная\n")
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/webhook")
 WEBHOOK_BASE = os.getenv("WEBHOOK_BASE")
 WEBHOOK_URL = WEBHOOK_BASE + WEBHOOK_PATH if WEBHOOK_BASE else None
-SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT",
-                          "Напиши один ответ от лица Ники. Как минимум один параграф, максимум четыре. Подробно и с погружением описывай все детали о действиях, эмоциях и окружении Ники. Старайся использовать разнообразный язык.")
+SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", "Ты виртуальный помощник, который помогает пользователям с их вопросами и задачами. Ты дружелюбный и отзывчивый.")
+FIRST_MESSAGE = os.getenv("FIRST_MESSAGE", "Привет, я Ника! А тебя как зовут?")
 TEMPERATURE = float(os.getenv("TEMPERATURE", 0.7))
 MIN_P = float(os.getenv("MIN_P", 0))
 TOP_P = float(os.getenv("TOP_P", 1))
@@ -135,7 +134,7 @@ async def run_llm(prompt):
             }
         }
     }
-    logging.info(f"Отправка запроса к LLM (runsync): {payload}")
+    logging.info(f"Отправка запроса к LLM: {payload}")
     try:
         async with aiohttp.ClientSession() as session:
             headers = {
@@ -143,14 +142,32 @@ async def run_llm(prompt):
                 "Content-Type": "application/json",
                 "Accept": "application/json"
             }
-            async with session.post(RUNPOD_ENDPOINT + "/runsync", json=payload, headers=headers, timeout=120) as response:
+            async with session.post(RUNPOD_ENDPOINT + "/runsync", json=payload, headers=headers, timeout=240) as response:
                 response.raise_for_status()
                 data = await response.json()
-                return data.get("output", {}).get("text", "[Ой! Кажется, у меня техническая проблема под кодовым именем Клубничка]")
+                output = data.get("output", {})
+                text = output.get("text")
+                if text is None:
+                    logging.error(f"Ответ LLM без текста: {data}")
+                    return "[Ой! Кажется, у меня техническая проблема под кодовым именем Клубничка]"
+                return text
     except Exception as e:
         logging.error(f"Ошибка при обращении к RunPod: {e}")
         return "[Ой! Кажется, у меня техническая проблема под кодовым именем Персик]"
 
+def build_prompt(memories, history):
+    # Формирует финальный промпт для LLM
+    prompt_parts = [
+        CHARACTER_CARD.strip(),
+        "\n***\n",
+        "Предыдущие события:\n",
+        "\n".join(memories).strip() if memories else "нет",
+        "\n***\n",
+        "Диалог:\n",
+        "\n".join(history).strip(),
+        "Ника:"
+    ]
+    return "\n".join(prompt_parts)
 
 # === ОБРАБОТКА СООБЩЕНИЙ ===
 @dp.message()
@@ -162,7 +179,7 @@ async def handle_message(message: Message):
     if user_input == "/start":
         logging.info(f"Команда /start от {chat_id}")
         chat_history[chat_id] = []
-        await message.answer("Привет, я Ника! А тебя как зовут?")
+        await message.answer(FIRST_MESSAGE)
         return
 
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
@@ -186,7 +203,7 @@ async def handle_message(message: Message):
     memories = find_similar(user_input, chat_id)
     history = truncate_history(chat_history[chat_id], CONTEXT_TOKEN_LIMIT)
 
-    prompt = "\n".join(memories + history + ["Ника:"])
+    prompt = build_prompt(memories, history)
     reply = await run_llm(prompt)
 
     chat_history[chat_id].append(f"Ника: {reply}")
