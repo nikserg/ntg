@@ -93,9 +93,14 @@ chat_history = {}
 
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+
+def remove_newlines(text):
+    """Удаляет переносы строк из текста, заменяя их на пробелы"""
+    return text.replace("\n", " ")
+
 def trim_incomplete_sentence(text):
     # Находит последнее завершённое предложение
-    match = re.search(r'([.!?…])[^.!?…]*$', text)
+    match = re.search(r'([.!?…\]])[^.!?…\]]*$', text)
     if match:
         end = match.end(1)
         return text[:end].strip()
@@ -180,9 +185,9 @@ async def run_llm(prompt):
                 response.raise_for_status()
                 data = await response.json()
                 # Проверяем, не вернулся ли статус IN_PROGRESS
-                if data.get("status") == "IN_PROGRESS" and data.get("id"):
+                if data.get("status") in ["IN_PROGRESS", "IN_QUEUE"] and data.get("id"):
                     task_id = data.get("id")
-                    logging.info(f"Получен статус IN_PROGRESS, id задачи: {task_id}")
+                    logging.info(f"Получен статус {data.get('status')}, id задачи: {task_id}")
 
                     # Ждем завершения задачи
                     max_attempts = 120
@@ -228,12 +233,9 @@ async def run_llm(prompt):
 def build_prompt(memories, history):
     # Формирует финальный промпт для LLM
     prompt_parts = [
-        CHARACTER_CARD.strip(),
-        "\n***\n",
         "Предыдущие события:\n",
         "\n".join(memories).strip() if memories else "нет",
         "\n***\n",
-        "Диалог:\n",
         "\n".join(history).strip(),
         "Ника:"
     ]
@@ -252,7 +254,7 @@ async def handle_message(message: Message):
     if user_input == "/start":
         logging.info(f"Команда /start от {chat_id}")
         first_message = FIRST_MESSAGE.replace('\\n', '\n')
-        chat_history[chat_id] = [f"Ника: {first_message}"]
+        chat_history[chat_id] = [f"Ника: {remove_newlines(first_message)}"]
         await message.answer(FIRST_MESSAGE.replace("\\n", "\n"))
         return
 
@@ -260,14 +262,16 @@ async def handle_message(message: Message):
 
     if chat_id not in chat_history:
         first_message = FIRST_MESSAGE.replace('\\n', '\n')
-        chat_history[chat_id] = [f"Ника: {first_message}"]
+        chat_history[chat_id] = [f"Ника: {remove_newlines(first_message)}"]
     if chat_id not in vector_store:
         vector_store[chat_id] = []
         vector_embeddings[chat_id] = []
 
-    chat_history[chat_id].append(f"Ты: {user_input}")
-    emb = embed_text(user_input)
-    vector_store[chat_id].append(user_input)
+    cleaned_input = remove_newlines(user_input)
+    cleaned_input_with_name = f"Ты: {cleaned_input}"
+    chat_history[chat_id].append(cleaned_input_with_name)
+    emb = embed_text(cleaned_input_with_name)
+    vector_store[chat_id].append(cleaned_input_with_name)
     vector_embeddings[chat_id].append(emb)
 
     if len(chat_history[chat_id]) > MAX_HISTORY_SIZE:
@@ -275,14 +279,20 @@ async def handle_message(message: Message):
         vector_store[chat_id] = vector_store[chat_id][-MAX_HISTORY_SIZE:]
         vector_embeddings[chat_id] = vector_embeddings[chat_id][-MAX_HISTORY_SIZE:]
 
-    memories = find_similar(user_input, chat_id)
+    memories = find_similar(cleaned_input, chat_id)
     history = truncate_history(chat_history[chat_id], CONTEXT_TOKEN_LIMIT)
 
     prompt = build_prompt(memories, history)
     reply = await run_llm(prompt)
     reply = trim_incomplete_sentence(reply)
+    cleaned_reply = remove_newlines(reply)
+    reply_with_name = f"Ника: {cleaned_reply}"
+    # Добавляем ответ бота в векторное хранилище
+    emb_reply = embed_text(reply_with_name)
+    vector_store[chat_id].append(reply_with_name)
+    vector_embeddings[chat_id].append(emb_reply)
 
-    chat_history[chat_id].append(f"Ника: {reply}")
+    chat_history[chat_id].append(reply_with_name)
     logging.info(f"Ответ пользователю {chat_id}: {reply}")
     await message.answer(reply)
 

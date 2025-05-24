@@ -22,7 +22,7 @@ jobs:
           pip install -r requirements.txt
       - name: Запуск тестов
         env:
-          TELEGRAM_TOKEN: "mock"
+          TELEGRAM_TOKEN: "0000000000:AAAAAAAAAAAAAAAA-AAAAAAAAAAAAAAAAAA"
           RUNPOD_ENDPOINT: "https://api-fake-endpoint/v2"
           WEBHOOK_BASE: "https://example.com"
         run: pytest -v
