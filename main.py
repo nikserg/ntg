@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import os
 import re
@@ -9,7 +10,6 @@ from pathlib import Path
 import aiohttp
 import tiktoken
 from aiogram import Bot, Dispatcher
-from aiogram.enums import ChatAction
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message
 from aiogram.webhook.aiohttp_server import setup_application, SimpleRequestHandler
@@ -93,6 +93,23 @@ chat_history = {}
 
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+async def keep_typing(chat_id: int, interval: float = 4.0):
+    """Периодически отправляет статус 'печатает' в чат."""
+    while True:
+        await bot.send_chat_action(chat_id, "typing")
+        await asyncio.sleep(interval)
+
+
+@contextlib.asynccontextmanager
+async def typing_action(chat_id: int):
+    """Контекстный менеджер, поддерживающий статус 'печатает' активным."""
+    task = asyncio.create_task(keep_typing(chat_id))
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
 def remove_newlines(text):
     """Удаляет переносы строк из текста, заменяя их на пробелы"""
@@ -267,52 +284,52 @@ async def handle_message(message: Message):
     chat_id = message.chat.id
     user_input = message.text.strip()
 
-    if user_input == "/start":
-        logging.info(f"Команда /start от {chat_id}")
-        first_message = FIRST_MESSAGE.replace('\\n', '\n')
-        chat_history[chat_id] = [f"Ника: {remove_newlines(first_message)}"]
-        await message.answer(FIRST_MESSAGE.replace("\\n", "\n"))
-        return
+    # Начинаем поддерживать статус "печатает..." сразу после получения сообщения
+    async with typing_action(chat_id):
+        if user_input == "/start":
+            logging.info(f"Команда /start от {chat_id}")
+            first_message = FIRST_MESSAGE.replace('\\n', '\n')
+            chat_history[chat_id] = [f"Ника: {remove_newlines(first_message)}"]
+            await message.answer(FIRST_MESSAGE.replace("\\n", "\n"))
+            return
 
-    await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+        if chat_id not in chat_history:
+            first_message = FIRST_MESSAGE.replace('\\n', '\n')
+            chat_history[chat_id] = [f"Ника: {remove_newlines(first_message)}"]
+        if chat_id not in vector_store:
+            vector_store[chat_id] = []
+            vector_embeddings[chat_id] = []
 
-    if chat_id not in chat_history:
-        first_message = FIRST_MESSAGE.replace('\\n', '\n')
-        chat_history[chat_id] = [f"Ника: {remove_newlines(first_message)}"]
-    if chat_id not in vector_store:
-        vector_store[chat_id] = []
-        vector_embeddings[chat_id] = []
+        cleaned_input = remove_newlines(user_input)
+        cleaned_input_with_name = f"Ты: {cleaned_input}"
+        chat_history[chat_id].append(cleaned_input_with_name)
+        emb = embed_text(cleaned_input_with_name)
+        vector_store[chat_id].append(cleaned_input_with_name)
+        vector_embeddings[chat_id].append(emb)
 
-    cleaned_input = remove_newlines(user_input)
-    cleaned_input_with_name = f"Ты: {cleaned_input}"
-    chat_history[chat_id].append(cleaned_input_with_name)
-    emb = embed_text(cleaned_input_with_name)
-    vector_store[chat_id].append(cleaned_input_with_name)
-    vector_embeddings[chat_id].append(emb)
+        if len(chat_history[chat_id]) > MAX_HISTORY_SIZE:
+            chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY_SIZE:]
+            vector_store[chat_id] = vector_store[chat_id][-MAX_HISTORY_SIZE:]
+            vector_embeddings[chat_id] = vector_embeddings[chat_id][-MAX_HISTORY_SIZE:]
 
-    if len(chat_history[chat_id]) > MAX_HISTORY_SIZE:
-        chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY_SIZE:]
-        vector_store[chat_id] = vector_store[chat_id][-MAX_HISTORY_SIZE:]
-        vector_embeddings[chat_id] = vector_embeddings[chat_id][-MAX_HISTORY_SIZE:]
+        # Сначала получаем историю
+        history = truncate_history(chat_history[chat_id], CONTEXT_TOKEN_LIMIT)
+        # Затем находим похожие сообщения, исключая те, что уже в контексте
+        memories = find_similar(cleaned_input, chat_id, current_context=history)
 
-    # Сначала получаем историю
-    history = truncate_history(chat_history[chat_id], CONTEXT_TOKEN_LIMIT)
-    # Затем находим похожие сообщения, исключая те, что уже в контексте
-    memories = find_similar(cleaned_input, chat_id, current_context=history)
+        prompt = build_prompt(memories, history)
+        reply = await run_llm(prompt)
+        reply = trim_incomplete_sentence(reply)
+        cleaned_reply = remove_newlines(reply)
+        reply_with_name = f"Ника: {cleaned_reply}"
+        # Добавляем ответ бота в векторное хранилище
+        emb_reply = embed_text(reply_with_name)
+        vector_store[chat_id].append(reply_with_name)
+        vector_embeddings[chat_id].append(emb_reply)
 
-    prompt = build_prompt(memories, history)
-    reply = await run_llm(prompt)
-    reply = trim_incomplete_sentence(reply)
-    cleaned_reply = remove_newlines(reply)
-    reply_with_name = f"Ника: {cleaned_reply}"
-    # Добавляем ответ бота в векторное хранилище
-    emb_reply = embed_text(reply_with_name)
-    vector_store[chat_id].append(reply_with_name)
-    vector_embeddings[chat_id].append(emb_reply)
-
-    chat_history[chat_id].append(reply_with_name)
-    logging.info(f"Ответ пользователю {chat_id}: {reply}")
-    await message.answer(reply)
+        chat_history[chat_id].append(reply_with_name)
+        logging.info(f"Ответ пользователю {chat_id}: {reply}")
+        await message.answer(reply)
 
 
 # === ЗАПУСК WEBHOOK ===

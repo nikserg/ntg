@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import numpy as np
@@ -53,6 +54,112 @@ def test_find_similar_empty():
     assert main.find_similar("тест", chat_id, current_context=["сообщение"]) == []
 
 
+def test_remove_newlines():
+    assert main.remove_newlines("Привет\nмир") == "Привет мир"
+    assert main.remove_newlines("Многострочный\nтекст\nс переносами") == "Многострочный текст с переносами"
+    assert main.remove_newlines("Текст без переносов") == "Текст без переносов"
+    assert main.remove_newlines("\n\n\n") == "   "
+
+
+@pytest.mark.asyncio
+async def test_typing_action():
+    # Мокируем бота
+    mock_bot = MagicMock()
+    mock_bot.send_chat_action = AsyncMock()
+
+    # Сохраняем оригинальный бот и заменяем его моком
+    original_bot = main.bot
+    main.bot = mock_bot
+
+    try:
+        # Проверяем нормальное выполнение в контексте
+        async with main.typing_action(123):
+            await asyncio.sleep(0.2)  # Даем время для выполнения keep_typing
+
+        # Проверяем, что метод вызывался с правильными параметрами
+        mock_bot.send_chat_action.assert_awaited_with(123, 'typing')
+        assert mock_bot.send_chat_action.await_count >= 1
+
+        # Сбрасываем счетчик вызовов
+        mock_bot.send_chat_action.reset_mock()
+
+        # Проверяем обработку исключений внутри контекста
+        with pytest.raises(ValueError):
+            async with main.typing_action(456):
+                await asyncio.sleep(0.1)
+                raise ValueError("Тестовое исключение")
+
+        # Статус должен вызываться даже при исключении
+        mock_bot.send_chat_action.assert_awaited_with(456, 'typing')
+    finally:
+        # Восстанавливаем оригинальный бот
+        main.bot = original_bot
+
+
+@pytest.mark.asyncio
+async def test_handle_message_with_typing_status(monkeypatch):
+    """Проверяет, что статус 'печатает' поддерживается во время обработки сообщения"""
+    chat_id = 888
+    message = MagicMock()
+    message.chat.id = chat_id
+    message.text = "Тест на долгую обработку"
+    message.answer = AsyncMock()
+
+    # Настраиваем хранилища
+    main.chat_history[chat_id] = []
+    main.vector_store[chat_id] = []
+    main.vector_embeddings[chat_id] = []
+
+    # Мокаем функции
+    monkeypatch.setattr(main, "embed_text", lambda x: np.ones(384, dtype="float32"))
+    monkeypatch.setattr(main.bot, "send_chat_action", AsyncMock())
+
+    # Создаем искусственную задержку в run_llm для проверки
+    async def slow_llm_response(*args, **kwargs):
+        await asyncio.sleep(0.5)  # Имитируем долгое выполнение запроса
+        return "Ответ после паузы"
+
+    monkeypatch.setattr(main, "run_llm", slow_llm_response)
+
+    # Обрабатываем сообщение
+    await main.handle_message(message)
+
+    # Проверяем, что бот поддерживал статус "печатает"
+    main.bot.send_chat_action.assert_awaited_with(chat_id, 'typing')
+    assert main.bot.send_chat_action.await_count >= 1
+
+    # Проверяем, что ответ был отправлен
+    message.answer.assert_awaited_once_with("Ответ после паузы")
+
+
+@pytest.mark.asyncio
+async def test_handle_first_message_not_start(monkeypatch):
+    """Тестирует обработку первого сообщения (не команда /start)"""
+    chat_id = 999
+    message = MagicMock()
+    message.chat.id = chat_id
+    message.text = "Привет! Я новый пользователь"
+    message.answer = AsyncMock()
+
+    # Удаляем историю, если она уже существует
+    if chat_id in main.chat_history:
+        del main.chat_history[chat_id]
+
+    # Мокаем необходимые функции
+    monkeypatch.setattr(main, "embed_text", lambda x: np.ones(384, dtype="float32"))
+    monkeypatch.setattr(main, "run_llm", AsyncMock(return_value="Привет, новый пользователь!"))
+    monkeypatch.setattr(main.bot, "send_chat_action", AsyncMock())
+
+    await main.handle_message(message)
+
+    # Проверяем, что история инициализирована
+    assert chat_id in main.chat_history
+    assert main.chat_history[chat_id][0].startswith("Ника:")
+
+    # Проверяем, что ответ отправлен
+    message.answer.assert_awaited_once_with("Привет, новый пользователь!")
+
+
 def test_find_similar_found():
     chat_id = 456
     emb = np.ones(384, dtype="float32")
@@ -89,6 +196,7 @@ def test_find_similar_with_context_filter():
             # С фильтрацией нескольких сообщений
             result = main.find_similar("тест", chat_id, current_context=["msg1", "msg3"], top_k=3)
             assert result == ["msg2"]
+
 
 def test_build_prompt():
     memories = ["было так", "ещё вот так"]
@@ -224,6 +332,7 @@ async def test_run_llm_in_progress_failed():
         assert "Апельсин" in result  # Проверяем кодовое слово в сообщении об ошибке
         assert session.get.call_count > 0
 
+
 @pytest.mark.asyncio
 async def test_run_llm_error():
     # Правильно создаем моки для асинхронного контекстного менеджера
@@ -249,7 +358,6 @@ def test_handle_message_start(monkeypatch):
     message.text = "/start"
     message.answer = AsyncMock()
     monkeypatch.setitem(main.chat_history, 1, [])
-    import asyncio
     asyncio.run(main.handle_message(message))
     message.answer.assert_awaited()
 
