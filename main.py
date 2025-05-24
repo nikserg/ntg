@@ -205,14 +205,16 @@ async def handle_message(message: Message):
 
     if user_input == "/start":
         logging.info(f"Команда /start от {chat_id}")
-        chat_history[chat_id] = [f"Ника: {FIRST_MESSAGE.replace('\\n', '\n')}"]
+        first_message = FIRST_MESSAGE.replace('\\n', '\n')
+        chat_history[chat_id] = [f"Ника: {first_message}"]
         await message.answer(FIRST_MESSAGE.replace("\\n", "\n"))
         return
 
     await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
 
     if chat_id not in chat_history:
-        chat_history[chat_id] = [f"Ника: {FIRST_MESSAGE.replace('\\n', '\n')}"]
+        first_message = FIRST_MESSAGE.replace('\\n', '\n')
+        chat_history[chat_id] = [f"Ника: {first_message}"]
     if chat_id not in vector_store:
         vector_store[chat_id] = []
         vector_embeddings[chat_id] = []
