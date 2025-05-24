@@ -1,22 +1,21 @@
 import logging
 import os
-import aiohttp
 import re
-
 # === LOAD ENV ===
 # Загружаем переменные окружения из .env файла, если он существует
 from pathlib import Path
 
+import aiohttp
 import tiktoken
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
+from aiogram.enums import ChatAction
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiogram.webhook.aiohttp_server import setup_application
 from aiohttp import web
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from sklearn.neighbors import NearestNeighbors
-from aiogram.enums import ChatAction
 
 env_path = Path('.') / '.env'
 if env_path.exists():
@@ -95,17 +94,38 @@ def trim_incomplete_sentence(text):
         return text[:end].strip()
     return text.strip()
 
+
 def truncate_history(messages, max_tokens):
-    # Сокращает историю сообщений по лимиту токенов
-    total = 0
-    kept = []
+    """
+    Обрезает историю сообщений, чтобы оставить максимальное
+    количество последних сообщений в рамках max_tokens.
+    """
+    if not messages:
+        return []
+
+    # Если все сообщения помещаются в лимит
+    total_tokens = sum(len(tokenizer.encode(msg)) for msg in messages)
+    if total_tokens <= max_tokens:
+        return messages
+
+    # Проверяем, помещается ли последнее сообщение
+    last_msg_tokens = len(tokenizer.encode(messages[-1]))
+    if last_msg_tokens > max_tokens:
+        return []  # Если последнее сообщение не помещается, возвращаем пустой список
+
+    # Собираем сообщения с конца, до достижения лимита
+    result = []
+    tokens_used = 0
+
     for msg in reversed(messages):
-        tokens = len(tokenizer.encode(msg))
-        if total + tokens > max_tokens:
-            break
-        kept.append(msg)
-        total += tokens
-    return list(reversed(kept))
+        msg_tokens = len(tokenizer.encode(msg))
+        if tokens_used + msg_tokens <= max_tokens:
+            result.insert(0, msg)  # Вставляем в начало для сохранения порядка
+            tokens_used += msg_tokens
+        else:
+            break  # Прекращаем добавлять сообщения, если не помещаются
+
+    return result
 
 
 def embed_text(text):
@@ -239,7 +259,7 @@ app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
 
 if WEBHOOK_URL:
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    impleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
 if __name__ == "__main__":
