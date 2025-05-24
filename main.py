@@ -11,7 +11,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ChatAction
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message
-from aiogram.webhook.aiohttp_server import setup_application
+from aiogram.webhook.aiohttp_server import setup_application, SimpleRequestHandler
 from aiohttp import web
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
@@ -261,7 +261,7 @@ app.on_startup.append(on_startup)
 app.on_shutdown.append(on_shutdown)
 
 if WEBHOOK_URL:
-    impleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
 if __name__ == "__main__":
