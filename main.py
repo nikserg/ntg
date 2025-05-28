@@ -625,7 +625,7 @@ async def handle_internal_request(request):
                                 f"{feedback_bonus_str}"
                                 f"Использовано сегодня: {daily_message_count} из {daily_limit}\n"
                                 f"\n"
-                                f"Используйте /invite для получения ссылки-приглашения и увеличения лимита."
+                                f"Используйте /invite для получения ссылки-приглашения и увеличения лимита.\n"
                                 f"Оставьте отзыв с помощью /feedback, чтобы получить дополнительный бонус!"
                                 f"\n\n{SUBSCRIBE_INVITE}"
                                 )
