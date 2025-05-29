@@ -8,12 +8,10 @@ from pathlib import Path
 
 import aiohttp
 import aiomysql
-import tiktoken
 from aiohttp import web
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from sentence_transformers import SentenceTransformer
 
 # === LOAD ENV ===
 # Загружаем переменные окружения из .env файла, если он существует
@@ -57,6 +55,8 @@ MAX_MESSAGES_PER_DAY = int(os.getenv("MAX_MESSAGES_PER_DAY", 50))
 ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED = int(os.getenv("ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED", 100))
 SUBSCRIBE_INVITE = os.getenv("SUBSCRIBE_INVITE", "")
 EXCLUDE_WORDS = json.loads(os.getenv("EXCLUDE_WORDS", "[]"))
+TOKENIZER_ENDPOINT = os.getenv("TOKENIZER_ENDPOINT", "")  # HTTP для токенизации текста
+EMBEDDER_ENDPOINT = os.getenv("EMBEDDER_ENDPOINT", "")  # HTTP для векторизации текста
 VECTOR_SIZE = 384  # Размерность для all-MiniLM-L6-v2
 # Асинхронное подключение к MySQL
 db_config = {
@@ -134,10 +134,6 @@ def init_qdrant_collection():
 
 # Комбинированный промпт для LLM
 full_system_prompt = f"{SYSTEM_PROMPT}\n{CHARACTER_CARD}"
-
-# === ИНИЦИАЛИЗАЦИЯ ===
-tokenizer = tiktoken.get_encoding("cl100k_base")
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
 # === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
 
@@ -310,7 +306,7 @@ def clean_llm_response(text):
     return text.strip()
 
 
-def truncate_history(messages, max_tokens):
+async def truncate_history(messages, max_tokens):
     """
     Обрезает историю сообщений, чтобы оставить максимальное
     количество последних сообщений в рамках max_tokens.
@@ -323,7 +319,22 @@ def truncate_history(messages, max_tokens):
     truncated = []
 
     for msg in reversed(messages):
-        msg_tokens = len(tokenizer.encode(msg["message"]))
+        # Обращаемся к отдельному сервису для токенизации, повторяем попытки при ошибках
+        async with aiohttp.ClientSession() as session:
+            retries = 3
+            for attempt in range(retries):
+                try:
+                    async with session.post(TOKENIZER_ENDPOINT, json={"text": msg["message"]}, timeout=30) as response:
+                        response.raise_for_status()
+                        data = await response.json()
+                        msg_tokens = data.get("tokens", 0)
+                        break
+                except Exception as e:
+                    logging.error(f"Ошибка при токенизации сообщения: {e}")
+                    if attempt == retries - 1:
+                        msg_tokens = len(msg["message"])  # Если не удалось получить токены, используем длину сообщения
+                    await asyncio.sleep(2 * (attempt + 1))  # экспоненциальная задержка
+
         if total_tokens + msg_tokens > max_tokens:
             break
         truncated.insert(0, msg)
@@ -332,33 +343,46 @@ def truncate_history(messages, max_tokens):
     return truncated
 
 
-def embed_text(text):
-    # Генерирует эмбеддинг текста
-    return embedder.encode([text], show_progress_bar=False)[0].astype("float32")
-
+async def embed_text(text):
+    # Обращаемся к отдельному сервису для векторизации, повторяем попытки при ошибках
+    async with aiohttp.ClientSession() as session:
+        retries = 3
+        for attempt in range(retries):
+            try:
+                async with session.post(EMBEDDER_ENDPOINT, json={"text": text}, timeout=30) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    embeddings = data.get("embeddings", [])
+                    return embeddings
+            except Exception as e:
+                logging.error(f"Ошибка при векторизации текста: {e}")
+                if attempt == retries - 1:
+                    raise
+                await asyncio.sleep(2 * (attempt + 1))
+                return None
+        return None
 
 async def find_similar(text, chat_id, current_context=None, top_k=3):
+    # Генерируем эмбеддинг для поиска
+    query_vector = await embed_text(text)
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
         None,
         find_similar_sync,
-        text, chat_id, current_context, top_k
+        chat_id, query_vector, current_context, top_k
     )
 
 
-def find_similar_sync(text, chat_id, current_context=None, top_k=3):
+def find_similar_sync(chat_id, query_vector, current_context=None, top_k=3):
     """Находит похожие сообщения в Qdrant, исключая те, что уже есть в контексте"""
     if current_context is None:
         current_context = []
-
-    # Генерируем эмбеддинг для поиска
-    query_vector = embed_text(text)
 
     try:
         # Ищем похожие сообщения в Qdrant только для данного chat_id
         search_result = qdrant_client.search(
             collection_name=QDRANT_COLLECTION_NAME,
-            query_vector=query_vector.tolist(),
+            query_vector=query_vector,
             query_filter=models.Filter(
                 must=[models.FieldCondition(key="chat_id", match=models.MatchValue(value=str(chat_id)))]
             ),
@@ -381,12 +405,12 @@ def find_similar_sync(text, chat_id, current_context=None, top_k=3):
         return []
 
 
-def save_message_to_qdrant(chat_id, message_text, role):
+async def save_message_to_qdrant(chat_id, message_text, role):
     """Сохраняет сообщение в Qdrant"""
     try:
         # Генерируем уникальный ID для сообщения (UUID)
         message_id = str(uuid.uuid4())
-        emb = embed_text(message_text)
+        emb = await embed_text(message_text)
         # Сохраняем сообщение и его вектор
         qdrant_client.upsert(
             collection_name=QDRANT_COLLECTION_NAME,
@@ -489,7 +513,7 @@ async def build_messages(chat_id, user_input):
     history_records = await get_current_messages(chat_id)
 
     # Обрезаем историю до лимита токенов
-    history = truncate_history(history_records, CONTEXT_TOKEN_LIMIT)
+    history = await truncate_history(history_records, CONTEXT_TOKEN_LIMIT)
 
     # Находим похожие сообщения из векторной БД
     memories = await find_similar(user_input, chat_id, current_context=[msg["message"] for msg in history])
@@ -659,7 +683,7 @@ async def handle_internal_request(request):
         cleaned_input = exclude_words_from_input(cleaned_input, EXCLUDE_WORDS)
         await save_message(chat_id, cleaned_input, "user")
         # Добавляем сообщение пользователя в Qdrant
-        save_message_to_qdrant(chat_id, cleaned_input, "user")
+        await save_message_to_qdrant(chat_id, cleaned_input, "user")
 
         # Формируем сообщения для LLM
         messages = await build_messages(chat_id, cleaned_input)
@@ -669,7 +693,7 @@ async def handle_internal_request(request):
         reply = trim_incomplete_sentence(reply)
         cleaned_reply = remove_newlines(reply)
         # Добавляем ответ бота в векторное хранилище
-        save_message_to_qdrant(chat_id, cleaned_reply, "assistant")
+        await save_message_to_qdrant(chat_id, cleaned_reply, "assistant")
         await save_message(chat_id, reply, "assistant")
         logging.info(f"Ответ пользователю {chat_id}: {reply}")
         return web.Response(text=reply)
@@ -741,6 +765,7 @@ async def apply_migrations():
 
 # === ЗАПУСК WEBHOOK ===
 async def on_startup(app):
+    await asyncio.get_event_loop().run_in_executor(None, init_qdrant_collection)
     # Применяем миграции
     await apply_migrations()
 
@@ -750,5 +775,4 @@ app.on_startup.append(on_startup)
 app.router.add_post('/internal', handle_internal_request)
 
 if __name__ == "__main__":
-    init_qdrant_collection()
     web.run_app(app, host="::", port=int(os.getenv("PORT", 8080)))
