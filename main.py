@@ -288,6 +288,8 @@ def clean_llm_response(text):
         text = text[len(f"{CHARACTER_NAME}:"):].strip()
     # Обрезаем, если ответ заканчивается на '\n\nИмя:'
     text = re.split(r'\n\w+:', text)[0]
+    # Обрезаем, если в конце есть объясниение
+    text = re.split(r'\*+ОБЪЯСНЕНИЕ:', text)[0]
     # Заменяем двойные пробелы на одинарные
     text = re.sub(r'\s{2,}', ' ', text)
     # Заменяем последовательность &amp; на амперсанд
