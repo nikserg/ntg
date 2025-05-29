@@ -417,7 +417,7 @@ async def save_message_to_qdrant(chat_id, message_text, role):
             points=[
                 models.PointStruct(
                     id=message_id,
-                    vector=emb.tolist(),
+                    vector=emb,
                     payload={"chat_id": str(chat_id), "text": message_text, "role": role}
                 )
             ]
