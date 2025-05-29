@@ -352,6 +352,14 @@ def test_clean_llm_response():
     cleaned_response = main.clean_llm_response(response)
     assert cleaned_response == "*улыбается* Привет!"
 
+    response = (
+        "*улыбается* Привет! *ОБЪЯСНЕНИЕ:*\n"
+        "- 123\n"
+        "- 456"
+    )
+    cleaned_response = main.clean_llm_response(response)
+    assert cleaned_response == "*улыбается* Привет!"
+
 
 @pytest.mark.parametrize("exclude_words,text,expected", [
     (["кот"], "Это кот и котик.", "Это и котик."),
