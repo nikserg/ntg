@@ -4,10 +4,10 @@ import re
 
 import aiohttp
 
+import db
 import qdrant
 from config import RUNPOD_API_KEY, CHARACTER_NAME, TOKENIZER_ENDPOINT, RUNPOD_ENDPOINT, SYSTEM_PROMPT, CHARACTER_CARD, \
     TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, CONTEXT_TOKEN_LIMIT
-from db import get_current_messages
 
 
 def trim_incomplete_sentence(text):
@@ -48,6 +48,11 @@ def clean_llm_response(text):
     # Убираем угловые скобки
     text = re.sub("<", '', text)
     text = re.sub(">", '', text)
+    # Убираем двойные звездочки
+    text = re.sub(r"\*\*", '*', text)
+    # Убираем одну звездочку, если она идет в конце сразу после переноса строки
+    text = re.sub(r"\n\*$", '\n', text)
+
     # Убираем неоконченные предложения
     text = trim_incomplete_sentence(text)
     return text.strip()
@@ -173,7 +178,7 @@ async def build_messages(chat_id, user_input):
     Формирует список сообщений для LLM из истории чата, векторной БД и системного промпта.
     """
     # Получаем историю чата из MySQL
-    history_records = await get_current_messages(chat_id)
+    history_records = await db.get_current_messages(chat_id)
 
     # Обрезаем историю до лимита токенов
     history = await truncate_history(history_records, CONTEXT_TOKEN_LIMIT)
@@ -182,11 +187,7 @@ async def build_messages(chat_id, user_input):
     memories = await qdrant.find_similar(user_input, chat_id, current_context=[msg["message"] for msg in history])
 
     # Формируем системное сообщение
-    system_message = {
-        "role": "system",
-        "content": f"{SYSTEM_PROMPT}\n***\n{CHARACTER_CARD}" + (
-            f"\n***\nПредыдущие сообщения:\n" + "\n".join(memories) if memories else "")
-    }
+    system_message = get_system_prompt(memories)
 
     # Формируем сообщения из истории чата
     messages = [system_message]
@@ -198,3 +199,12 @@ async def build_messages(chat_id, user_input):
             messages.append({"role": "user", "content": msg["message"]})
 
     return messages
+
+
+def get_system_prompt(memories):
+    """Возвращает системный промпт для LLM."""
+    return {
+        "role": "system",
+        "content": f"{SYSTEM_PROMPT}\n***\n{CHARACTER_CARD}" + (
+            f"\n***\nПредыдущие сообщения:\n" + "\n".join(memories) if memories else "")
+    }

@@ -1,9 +1,9 @@
 import logging
 import re
 
+import db
 from config import ADDITIONAL_MESSAGES_PER_DAY_FOR_FEEDBACK, ADDITIONAL_MESSAGES_PER_DAY_FOR_USEFUL_FEEDBACK, \
     SUBSCRIBE_INVITE
-from db import execute_query
 
 # Хранилище для отслеживания сбора отзывов
 collecting_feedback = {}
@@ -15,7 +15,7 @@ async def write_feedback(chat_id, feedback_text):
                     INSERT INTO feedbacks (chat_id, feedback)
                     VALUES (%s, %s)
                     """
-    await execute_query(query, (chat_id, feedback_text))
+    await db.execute_query(query, (chat_id, feedback_text))
 
 
 async def collect_feedback(chat_id, text):

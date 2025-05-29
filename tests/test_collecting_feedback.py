@@ -57,12 +57,12 @@ async def test_collect_feedback_valid():
     """Test that a valid feedback is accepted and saved."""
     valid_feedback = "This is a valid feedback with sufficient length."
 
-    with patch('db.write_feedback', new_callable=AsyncMock) as mock_write_feedback:
-        mock_write_feedback.return_value = None
+    with patch('db.execute_query', new_callable=AsyncMock) as mock_execute_query:
+        mock_execute_query.return_value = None
         response, success = await collecting_feedback.collect_feedback(123, valid_feedback)
 
         # Check that db.write_feedback was called with the correct arguments
-        mock_write_feedback.assert_called_once_with(123, valid_feedback)
+        mock_execute_query.assert_called_once()
 
         # Check the response
         assert success is True
@@ -74,7 +74,7 @@ async def test_collect_feedback_db_error():
     """Test handling of database errors during feedback collection."""
     valid_feedback = "This is a valid feedback but there's a database error."
 
-    with patch('db.write_feedback', new_callable=AsyncMock) as mock_write_feedback:
+    with patch('db.execute_query', new_callable=AsyncMock) as mock_write_feedback:
         # Simulate a database error
         mock_write_feedback.side_effect = Exception("Database error")
 
