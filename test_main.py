@@ -1,12 +1,12 @@
 from unittest.mock import patch, AsyncMock, MagicMock
 
 from aiohttp import web
+from aioresponses import aioresponses
 
 # Мокируем Qdrant клиент перед импортом main
 with patch('qdrant_client.QdrantClient'), patch('qdrant_client.http.api_client.ApiClient'):
     pass
 
-import numpy as np
 import pytest
 import main
 
@@ -59,30 +59,48 @@ def test_trim_incomplete_sentence():
     assert main.trim_incomplete_sentence("Текст заканчивается. на вот это[") == "Текст заканчивается."
 
 
-def test_truncate_history():
-    # Мокаем токенизатор
-    main.tokenizer = MagicMock()
-    main.tokenizer.encode = lambda x: [0] * len(x)
+@pytest.mark.asyncio
+async def test_truncate_history(monkeypatch):
+    from main import truncate_history, TOKENIZER_ENDPOINT
 
-    messages = [{"message": "a" * 5}, {"message": "b" * 10}, {"message": "c" * 20}]
-    result = main.truncate_history(messages, max_tokens=100)
-    assert result == messages
+    messages = [
+        {"message": "a" * 5},
+        {"message": "b" * 10},
+        {"message": "c" * 20}
+    ]
 
-    result = main.truncate_history(messages, max_tokens=31)
-    assert result == [{"message": "b" * 10}, {"message": "c" * 20}]
+    with aioresponses() as m:
+        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 5})
+        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 10})
+        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 20})
 
-    result = main.truncate_history(messages, max_tokens=20)
-    assert result == [{"message": "c" * 20}]
+        result = await truncate_history(messages, max_tokens=100)
+        assert result == messages
 
-    result = main.truncate_history(messages, max_tokens=10)
-    assert result == []
+        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 10})
+        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 20})
+        result = await truncate_history(messages, max_tokens=31)
+        assert result == [{"message": "b" * 10}, {"message": "c" * 20}]
+
+        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 20})
+        result = await truncate_history(messages, max_tokens=20)
+        assert result == [{"message": "c" * 20}]
+
+        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 20})
+        result = await truncate_history(messages, max_tokens=19)
+        assert result == []
 
 
-def test_embed_text():
-    with patch.object(main.embedder, "encode", return_value=[np.arange(384, dtype="float32")]):
-        emb = main.embed_text("тест")
-        assert isinstance(emb, np.ndarray)
-        assert emb.shape[0] == 384
+@pytest.mark.asyncio
+async def test_embed_text(monkeypatch):
+    from main import embed_text, EMBEDDER_ENDPOINT
+
+    # Мокаем внешний API эмбеддинга
+    with aioresponses() as m:
+        m.post(EMBEDDER_ENDPOINT, payload={"embeddings": [1, 2, 3]})
+
+        result = await embed_text("тест")
+        assert result == [1, 2, 3]
 
 def test_remove_newlines():
     assert main.remove_newlines("Привет\nмир") == "Привет мир"
@@ -121,7 +139,7 @@ async def test_handle_internal_request_regular(monkeypatch):
     monkeypatch.setattr(main, "save_message", AsyncMock())
     monkeypatch.setattr(main, "exclude_words_from_input", lambda *a, **kw: a[0])
     monkeypatch.setattr(main, "remove_newlines", lambda *a, **kw: a[0])
-    monkeypatch.setattr(main, "save_message_to_qdrant", lambda *a, **kw: None)
+    monkeypatch.setattr(main, "save_message_to_qdrant", AsyncMock())
     monkeypatch.setattr(main, "trim_incomplete_sentence", lambda *a, **kw: a[0])
     monkeypatch.setattr(main, "build_messages", AsyncMock(return_value=[{"role": "user", "content": "test"}]))
     monkeypatch.setattr(main, "run_llm", AsyncMock(return_value="Ответ!"))
@@ -407,7 +425,7 @@ async def test_build_messages(monkeypatch):
         {"message": "Hello", "role": "user"},
         {"message": "Hi there", "role": "assistant"}
     ]))
-    monkeypatch.setattr(main, "truncate_history", lambda msgs, max_tokens: msgs)
+    monkeypatch.setattr(main, "truncate_history", AsyncMock(side_effect=lambda msgs, max_tokens: msgs))
     monkeypatch.setattr(main, "find_similar", AsyncMock(return_value=["Арсен: Similar message"]))
 
     messages = await main.build_messages(123, "test query")

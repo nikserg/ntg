@@ -1,5 +1,5 @@
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 import numpy as np
 import pytest
@@ -55,7 +55,7 @@ async def test_find_similar_found(monkeypatch):
     ]
 
     # Мокируем embed_text и qdrant_client.search
-    monkeypatch.setattr(main, "embed_text", lambda x: np.ones(384, dtype="float32"))
+    monkeypatch.setattr(main, "embed_text", AsyncMock(return_value=np.ones(384, dtype="float32")))
     monkeypatch.setattr(main.qdrant_client, "search", MagicMock(return_value=mock_results))
 
     # Тестируем функцию
@@ -81,7 +81,7 @@ async def test_find_similar_with_context_filter(monkeypatch):
     ]
 
     # Мокируем embed_text и qdrant_client.search
-    monkeypatch.setattr(main, "embed_text", lambda x: np.ones(384, dtype="float32"))
+    monkeypatch.setattr(main, "embed_text", AsyncMock(return_value=np.ones(384, dtype="float32")))
     monkeypatch.setattr(main.qdrant_client, "search", MagicMock(return_value=mock_results))
 
     # Тестируем функцию без фильтрации контекста
@@ -96,7 +96,9 @@ async def test_find_similar_with_context_filter(monkeypatch):
     result = await main.find_similar("тест", chat_id, current_context=["msg1", "msg3"], top_k=3)
     assert result == ["Арсен: msg2"]
 
-def test_save_message_to_qdrant(monkeypatch):
+
+@pytest.mark.asyncio
+async def test_save_message_to_qdrant(monkeypatch):
     """Тестируем сохранение сообщения в Qdrant"""
     chat_id = 123
     message_text = "Тестовое сообщение"
@@ -109,8 +111,11 @@ def test_save_message_to_qdrant(monkeypatch):
     # Мокируем uuid для предсказуемости
     monkeypatch.setattr(main.uuid, "uuid4", MagicMock(return_value="test-uuid"))
 
+    # Мокируем embed_text, чтобы не делать реальный вызов
+    monkeypatch.setattr(main, "embed_text", AsyncMock(return_value=message_vector))
+
     # Тестируем функцию
-    result = main.save_message_to_qdrant(chat_id, message_text, message_vector)
+    result = await main.save_message_to_qdrant(chat_id, message_text, "user")
     assert result == True
 
     # Проверяем вызов с правильными параметрами
@@ -120,4 +125,3 @@ def test_save_message_to_qdrant(monkeypatch):
     assert len(kwargs["points"]) == 1
     point = kwargs["points"][0]
     assert point.id == "test-uuid"
-
