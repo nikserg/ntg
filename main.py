@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 
@@ -37,24 +38,24 @@ async def handle_internal_request(request):
 
         # Проверяем, собираем ли отзыв
         if collecting_feedback.is_collecting_feedback(chat_id):
-            return web.Response(text=await collecting_feedback.handle_feedback(chat_id, user_input))
+            return json_response({"text": await collecting_feedback.handle_feedback(chat_id, user_input)})
 
         if user_input.startswith("/start"):
-            return web.Response(text=await start.handle_command(chat_id, user_input))
+            return json_response({"text": await start.handle_command(chat_id, user_input)})
 
         if user_input == "/feedback":
-            return web.Response(text=collecting_feedback.handle_command(chat_id))
+            return json_response({"text": collecting_feedback.handle_command(chat_id)})
 
         if user_input == "/invite":
-            return web.Response(text=await invite.handle_command(chat_id))
+            return json_response({"text": await invite.handle_command(chat_id)})
 
         if user_input == "/limit":
-            return web.Response(text=await limits.handle_command(chat_id))
+            return json_response({"text": await limits.handle_command(chat_id)})
 
         # Проверяем, не превышен ли лимит сообщений
         limit_exceeded, limit_exceeded_message = await limits.is_limit_exceeded(chat_id)
         if limit_exceeded:
-            return web.Response(text=limit_exceeded_message)
+            return json_response({"text": limit_exceeded_message})
 
         # Лимит не превышен, формируем ответ пользователю из LLM
 
@@ -77,11 +78,19 @@ async def handle_internal_request(request):
         # Сохраняем ответ в БД (c новыми строками, т.к. это важно для контекста)
         await save_message(chat_id, reply, "assistant")
         logging.info(f"Ответ пользователю {chat_id}: {reply}")
-        return web.Response(text=reply)
+        return json_response({"text": reply})
     except Exception as e:
         logging.error(f"Ошибка при обработке /internal: {e}")
-        return web.Response(text=f"Ошибка: {e}", status=500)
+        return json_response({"text": f"Ошибка: {str(e)}"}, 500)
 
+
+def json_response(data, status=200):
+    """Утилита для создания JSON ответа."""
+    return web.Response(
+        text=json.dumps(data, ensure_ascii=False),
+        status=status,
+        content_type='application/json'
+    )
 
 # При старте приложения выполняем инициализацию Qdrant и миграции
 async def on_startup(app):

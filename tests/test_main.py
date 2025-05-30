@@ -1,8 +1,13 @@
+import os
+import sys
 from unittest.mock import patch, MagicMock
 
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
+
+# Add the parent directory to sys.path to allow importing modules from the parent directory
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from main import handle_internal_request, on_startup, app
 
@@ -19,7 +24,7 @@ def app_fixture():
 async def test_handle_internal_request_collecting_feedback(mock_handle_feedback, mock_is_collecting_feedback):
     """Test handling a request when collecting feedback."""
     mock_is_collecting_feedback.return_value = True
-    mock_handle_feedback.return_value = "Thank you for your feedback!"
+    mock_handle_feedback.return_value = "Спасибо!"
 
     request_data = {"text": "This is my feedback", "chat_id": "12345"}
     request = make_mocked_request('POST', '/internal')
@@ -33,7 +38,7 @@ async def test_handle_internal_request_collecting_feedback(mock_handle_feedback,
     response = await handle_internal_request(request)
 
     assert response.status == 200
-    assert response.text == "Thank you for your feedback!"
+    assert response.text == "{\"text\": \"Спасибо!\"}"
     mock_is_collecting_feedback.assert_called_once_with("12345")
     mock_handle_feedback.assert_called_once_with("12345", "This is my feedback")
 
@@ -44,7 +49,7 @@ async def test_handle_internal_request_collecting_feedback(mock_handle_feedback,
 async def test_handle_internal_request_start_command(mock_start_handle_command, mock_is_collecting_feedback):
     """Test handling a /start command."""
     mock_is_collecting_feedback.return_value = False
-    mock_start_handle_command.return_value = "Welcome message"
+    mock_start_handle_command.return_value = "Приветственное сообщение"
 
     request_data = {"text": "/start", "chat_id": "12345"}
     request = make_mocked_request('POST', '/internal')
@@ -57,7 +62,7 @@ async def test_handle_internal_request_start_command(mock_start_handle_command, 
     response = await handle_internal_request(request)
 
     assert response.status == 200
-    assert response.text == "Welcome message"
+    assert response.text == "{\"text\": \"Приветственное сообщение\"}"
     mock_is_collecting_feedback.assert_called_once_with("12345")
     mock_start_handle_command.assert_called_once_with("12345", "/start")
 
@@ -68,7 +73,7 @@ async def test_handle_internal_request_start_command(mock_start_handle_command, 
 async def test_handle_internal_request_feedback_command(mock_feedback_handle_command, mock_is_collecting_feedback):
     """Test handling a /feedback command."""
     mock_is_collecting_feedback.return_value = False
-    mock_feedback_handle_command.return_value = "Please provide your feedback"
+    mock_feedback_handle_command.return_value = "Пожалуйста, оставьте отзыв"
 
     request_data = {"text": "/feedback", "chat_id": "12345"}
     request = make_mocked_request('POST', '/internal')
@@ -81,7 +86,7 @@ async def test_handle_internal_request_feedback_command(mock_feedback_handle_com
     response = await handle_internal_request(request)
 
     assert response.status == 200
-    assert response.text == "Please provide your feedback"
+    assert response.text == "{\"text\": \"Пожалуйста, оставьте отзыв\"}"
     mock_is_collecting_feedback.assert_called_once_with("12345")
     mock_feedback_handle_command.assert_called_once_with("12345")
 
@@ -92,7 +97,7 @@ async def test_handle_internal_request_feedback_command(mock_feedback_handle_com
 async def test_handle_internal_request_invite_command(mock_invite_handle_command, mock_is_collecting_feedback):
     """Test handling an /invite command."""
     mock_is_collecting_feedback.return_value = False
-    mock_invite_handle_command.return_value = "Here's your invite link"
+    mock_invite_handle_command.return_value = "Ваша ссылка для приглашения"
 
     request_data = {"text": "/invite", "chat_id": "12345"}
     request = make_mocked_request('POST', '/internal')
@@ -105,7 +110,7 @@ async def test_handle_internal_request_invite_command(mock_invite_handle_command
     response = await handle_internal_request(request)
 
     assert response.status == 200
-    assert response.text == "Here's your invite link"
+    assert response.text == "{\"text\": \"Ваша ссылка для приглашения\"}"
     mock_is_collecting_feedback.assert_called_once_with("12345")
     mock_invite_handle_command.assert_called_once_with("12345")
 
@@ -116,7 +121,7 @@ async def test_handle_internal_request_invite_command(mock_invite_handle_command
 async def test_handle_internal_request_limit_command(mock_limits_handle_command, mock_is_collecting_feedback):
     """Test handling a /limit command."""
     mock_is_collecting_feedback.return_value = False
-    mock_limits_handle_command.return_value = "Your current usage limits"
+    mock_limits_handle_command.return_value = "Ваш текущий лимит"
 
     request_data = {"text": "/limit", "chat_id": "12345"}
     request = make_mocked_request('POST', '/internal')
@@ -129,7 +134,7 @@ async def test_handle_internal_request_limit_command(mock_limits_handle_command,
     response = await handle_internal_request(request)
 
     assert response.status == 200
-    assert response.text == "Your current usage limits"
+    assert response.text == "{\"text\": \"Ваш текущий лимит\"}"
     mock_is_collecting_feedback.assert_called_once_with("12345")
     mock_limits_handle_command.assert_called_once_with("12345")
 
@@ -140,7 +145,7 @@ async def test_handle_internal_request_limit_command(mock_limits_handle_command,
 async def test_handle_internal_request_limit_exceeded(mock_is_limit_exceeded, mock_is_collecting_feedback):
     """Test handling a request when the user has exceeded their message limit."""
     mock_is_collecting_feedback.return_value = False
-    mock_is_limit_exceeded.return_value = (True, "You've exceeded your message limit")
+    mock_is_limit_exceeded.return_value = (True, "Вы превысили дневной лимит")
 
     request_data = {"text": "Hello bot", "chat_id": "12345"}
     request = make_mocked_request('POST', '/internal')
@@ -153,7 +158,7 @@ async def test_handle_internal_request_limit_exceeded(mock_is_limit_exceeded, mo
     response = await handle_internal_request(request)
 
     assert response.status == 200
-    assert response.text == "You've exceeded your message limit"
+    assert response.text == "{\"text\": \"Вы превысили дневной лимит\"}"
     mock_is_collecting_feedback.assert_called_once_with("12345")
     mock_is_limit_exceeded.assert_called_once_with("12345")
 
@@ -195,7 +200,7 @@ async def test_handle_internal_request_normal_message(
     response = await handle_internal_request(request)
 
     assert response.status == 200
-    assert response.text == "Hello human!"
+    assert response.text == "{\"text\": \"Hello human!\"}"
     mock_is_collecting_feedback.assert_called_once_with("12345")
     mock_is_limit_exceeded.assert_called_once_with("12345")
     mock_get_messages.assert_called_once_with("12345")
@@ -231,7 +236,7 @@ async def test_handle_internal_request_exception(mock_is_collecting_feedback):
     response = await handle_internal_request(request)
 
     assert response.status == 500
-    assert "Ошибка: Test exception" in response.text
+    assert response.text == "{\"text\": \"Ошибка: Test exception\"}"
 
 
 @pytest.mark.asyncio
