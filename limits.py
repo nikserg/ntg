@@ -9,8 +9,9 @@ async def count_daily_messages(chat_id):
     query = """
             SELECT COUNT(*)
             FROM messages
-            WHERE chat_id = %s
-              AND DATE(time) = CURDATE() \
+            LEFT JOIN dialogues ON messages.dialogue_id = dialogues.id
+            WHERE dialogues.chat_id = %s
+              AND DATE(messages.time) = CURDATE() \
             """
     async with (await get_db_connection()) as conn:
         async with conn.cursor() as cursor:
@@ -25,7 +26,7 @@ async def get_feedback_bonus(chat_id):
     - has_feedback: True, если есть хотя бы один фидбек
     - is_useful: True, если хотя бы один фидбек отмечен как полезный
     """
-    query = "SELECT useful FROM feedbacks WHERE chat_id = %s LIMIT 1"
+    query = "SELECT useful FROM feedbacks WHERE chat_id = %s ORDER BY useful DESC LIMIT 1"
     async with (await get_db_connection()) as conn:
         async with conn.cursor() as cursor:
             await cursor.execute(query, (chat_id,))

@@ -11,7 +11,7 @@ from sanitizer import remove_newlines
 async def reset_history_in_db(chat_id):
     """Сбрасывает историю сообщений для чата, помечая все сообщения как неактуальные"""
     query = """
-                UPDATE messages
+                UPDATE dialogues \
                 SET is_current = FALSE
                 WHERE chat_id = %s \
                 """
@@ -51,8 +51,8 @@ async def handle_command(chat_id, user_input):
     # Регистрируем или получаем пользователя
     await get_or_create_user(chat_id, invited_by)
 
-    # Сбрасываем историю сообщений и отправляем приветственное сообщение
-    await reset_history_in_db(chat_id)
+    # Сбрасываем историю сообщений в БД и Qdrant
+    await reset_history(chat_id)
 
     # Возвращаем текст ответа и картинку
     return await add_first_messages_to_db(chat_id), await get_random_start_image()
@@ -60,8 +60,7 @@ async def handle_command(chat_id, user_input):
 
 async def add_first_messages_to_db(chat_id):
     first_message = FIRST_MESSAGE.replace('\\n', '\n')
-    await save_message(chat_id, USER_FIRST_MESSAGE,
-                       "user")  # Это сообщение не будет видно пользователю, но сохранится в БД
+    await save_message(chat_id, USER_FIRST_MESSAGE, "user")  # Это сообщение только сохранится в БД
     await save_message(chat_id, remove_newlines(first_message), "assistant")
     return FIRST_MESSAGE.replace("\\n", "\n")
 

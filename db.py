@@ -54,21 +54,45 @@ async def get_or_create_user(chat_id, invited_by=None):
 # Асинхронное сохранение сообщения
 async def save_message(chat_id, message, role):
     """Сохраняет сообщение в базе данных"""
+    # Получаем текущий диалог для чата
+    dialogue_id = await get_current_dialogue(chat_id)
     query = """
-            INSERT INTO messages (chat_id, message, role, is_current)
-            VALUES (%s, %s, %s, %s) \
+            INSERT INTO messages (dialogue_id, message, role)
+            VALUES (%s, %s, %s) \
             """
-    await execute_query(query, (chat_id, message, role, True))
+    await execute_query(query, (dialogue_id, message, role))
+
+
+async def get_current_dialogue(chat_id):
+    """Получает текущий диалог для чата"""
+    query = """
+            SELECT id FROM dialogues
+            WHERE chat_id = %s AND is_current = TRUE \
+            """
+    async with (await get_db_connection()) as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cursor:
+            await cursor.execute(query, (chat_id,))
+            result = await cursor.fetchone()
+            if result:
+                return result["id"]
+    # Если диалог не найден, можно создать новый
+    query = """
+            INSERT INTO dialogues (chat_id)
+            VALUES (%s) \
+            """
+    await execute_query(query, (chat_id,))
+    return await get_current_dialogue(chat_id)
 
 
 async def get_current_messages(chat_id):
     """Получает текущие сообщения для чата"""
     query = """
-            SELECT message, role
+            SELECT messages.message, messages.role
             FROM messages
-            WHERE chat_id = %s
-              AND is_current = TRUE
-            ORDER BY time ASC \
+            LEFT JOIN dialogues ON messages.dialogue_id = dialogues.id
+            WHERE dialogues.chat_id = %s
+              AND dialogues.is_current = TRUE
+            ORDER BY messages.time ASC \
             """
     async with (await get_db_connection()) as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:

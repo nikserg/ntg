@@ -5,61 +5,76 @@ from db import execute_query
 
 async def apply_migrations():
     """Применяет миграции для базы данных."""
-    await execute_query("""
-        CREATE TABLE IF NOT EXISTS messages (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            chat_id BIGINT NOT NULL,
-            message TEXT NOT NULL,
-            role VARCHAR(50) NOT NULL,
-            is_current BOOLEAN DEFAULT TRUE,
-            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-    await execute_query("""
-        CREATE TABLE IF NOT EXISTS feedbacks (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            chat_id BIGINT NOT NULL,
-            feedback TEXT NOT NULL,
-            time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
-    await execute_query("""
-        CREATE TABLE IF NOT EXISTS users (
-            chat_id BIGINT PRIMARY KEY,
-            invite_code VARCHAR(36) UNIQUE NOT NULL,
-            invited_by BIGINT DEFAULT NULL,
-            registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            INDEX (invited_by)
-        );
-    """)
+    queries = """
+    create table if not exists dialogues
+(
+	id int auto_increment
+		primary key,
+	is_current tinyint(1) default 1 null,
+	created_at timestamp default CURRENT_TIMESTAMP null,
+	chat_id bigint not null
+);
 
-    # Добавляем индексы отдельно, чтобы не вызывать ошибки при повторном запуске
-    add_indexes = [
-        "ALTER TABLE messages ADD INDEX idx_messages_chat_current (chat_id, is_current);",
-        "ALTER TABLE messages ADD INDEX idx_messages_chat_time (chat_id, time);",
-        "ALTER TABLE feedbacks ADD INDEX idx_feedbacks_chat_id (chat_id);"
-    ]
-    for index_query in add_indexes:
-        try:
-            await execute_query(index_query)
-        except Exception as e:
-            # Игнорируем ошибки, если индекс уже существует
-            logging.info(f"При создании индекса: {e}")
-    # Добавляем столбец за полезный фидбек, если его нет
-    alter_feedbacks_table = """
-        ALTER TABLE feedbacks ADD COLUMN useful BOOLEAN DEFAULT FALSE;
+create index idx_dialogues_chat_is_current
+	on dialogues (chat_id, is_current);
+
+create table if not exists feedbacks
+(
+	id int auto_increment
+		primary key,
+	chat_id bigint not null,
+	feedback text not null,
+	time timestamp default CURRENT_TIMESTAMP null,
+	useful tinyint(1) default 0 null
+);
+
+create index idx_feedbacks_chat_id
+	on feedbacks (chat_id);
+
+create table if not exists images
+(
+	id int auto_increment
+		primary key,
+	content mediumblob not null,
+	created_at timestamp default CURRENT_TIMESTAMP null
+);
+
+create table if not exists messages
+(
+	id int auto_increment
+		primary key,
+	message text not null,
+	role varchar(50) not null,
+	time timestamp default CURRENT_TIMESTAMP null,
+	dialogue_id int not null
+);
+
+create index idx_messages_dialogue_id
+	on messages (dialogue_id);
+
+create index idx_messages_dialogue_time
+	on messages (dialogue_id, time);
+
+create table if not exists users
+(
+	chat_id bigint not null
+		primary key,
+	invite_code varchar(36) not null,
+	invited_by bigint null,
+	registered_at timestamp default CURRENT_TIMESTAMP null,
+	constraint invite_code
+		unique (invite_code)
+);
+
+create index invited_by
+	on users (invited_by);
     """
-    try:
-        await execute_query(alter_feedbacks_table)
-    except Exception as e:
-        # Игнорируем ошибки, если столбец уже существует
-        logging.info(f"При добавлении столбца useful в таблицу feedbacks: {e}")
-
-    # Добавляем хранилище изображений
-    await execute_query("""
-        CREATE TABLE IF NOT EXISTS images (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            content MEDIUMBLOB NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
+    # Разбиваем запросы на отдельные команды
+    for query in queries.strip().split(';'):
+        query = query.strip()
+        if query:
+            try:
+                await execute_query(query)
+                logging.info(f"Миграция выполнена: {query}")
+            except Exception as e:
+                logging.info(f"Ошибка при выполнении миграции: {query}. Ошибка: {e}")
