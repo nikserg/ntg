@@ -5,6 +5,7 @@ import uuid
 import aiomysql
 
 from config import db_config
+from tokenizer import count_tokens
 
 
 async def get_db_connection(retries=3, delay=1):
@@ -56,11 +57,13 @@ async def save_message(chat_id, message, role):
     """Сохраняет сообщение в базе данных"""
     # Получаем текущий диалог для чата
     dialogue_id = await get_current_dialogue(chat_id)
+    # Считаем количество токенов в сообщении
+    token_count = await count_tokens(message)
     query = """
-            INSERT INTO messages (dialogue_id, message, role)
-            VALUES (%s, %s, %s) \
+            INSERT INTO messages (dialogue_id, message, role, token_count)
+            VALUES (%s, %s, %s, %s) \
             """
-    await execute_query(query, (dialogue_id, message, role))
+    await execute_query(query, (dialogue_id, message, role, token_count))
 
 
 async def get_current_dialogue(chat_id):
@@ -87,7 +90,7 @@ async def get_current_dialogue(chat_id):
 async def get_current_messages(chat_id):
     """Получает текущие сообщения для чата"""
     query = """
-            SELECT messages.message, messages.role
+            SELECT messages.message, messages.role, messages.token_count
             FROM messages
             LEFT JOIN dialogues ON messages.dialogue_id = dialogues.id
             WHERE dialogues.chat_id = %s

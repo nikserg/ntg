@@ -68,6 +68,8 @@ create table if not exists users
 
 create index invited_by
 	on users (invited_by);
+	
+alter table messages add column token_count int default 0 null;
     """
     # Разбиваем запросы на отдельные команды
     for query in queries.strip().split(';'):
