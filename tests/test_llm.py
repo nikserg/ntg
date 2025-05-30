@@ -8,8 +8,7 @@ from aioresponses import aioresponses
 # Add the parent directory to sys.path to allow importing modules from the parent directory
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import llm
-import db
-import qdrant
+
 
 def test_clean_llm_response():
     response = "Это тестовый ответ. С уважением, Арсен."
@@ -86,12 +85,19 @@ def test_clean_llm_response():
     cleaned_response = llm.clean_llm_response(response)
     assert cleaned_response == "Это тестовое предложение * вот так *"
 
+    response = "*это* Полностью... Нормальный, да. *ответ* ...да. да."
+    cleaned_response = llm.clean_llm_response(response)
+    assert cleaned_response == "*это* Полностью... Нормальный, да. *ответ* ...да. да."
+
 
 def test_get_system_prompt():
     # Test with default character name
-    system_prompt = llm.get_system_prompt(["Абдулла поше попить", "Ты - Арсен"])
+    system_prompt = llm.get_system_prompt(["Абдулла поше попить", "Ты - Арсен"], "Арсен", "Класный персонаж",
+                                          "Первое резюме")
     assert "Абдулла поше попить" in system_prompt.get('content')
     assert "Ты - Арсен" in system_prompt.get('content')
+    assert "Класный персонаж" in system_prompt.get('content')
+    assert "Первое резюме" in system_prompt.get('content')
     assert system_prompt.get("role") == "system"
 
 
@@ -105,48 +111,41 @@ def test_trim_incomplete_sentence():
     assert llm.trim_incomplete_sentence("Текст заканчивается. на [вот это]") == "Текст заканчивается. на [вот это]"
     assert llm.trim_incomplete_sentence("Текст заканчивается. на вот это[") == "Текст заканчивается."
 
+
 @pytest.mark.asyncio
 async def test_truncate_history(monkeypatch):
-    from llm import truncate_history, TOKENIZER_ENDPOINT
+    from llm import truncate_history
 
     messages = [
-        {"message": "a" * 5},
-        {"message": "b" * 10},
-        {"message": "c" * 20}
+        {"message": "a" * 5, "token_count": 5},
+        {"message": "b" * 10, "token_count": 10},
+        {"message": "c" * 20, "token_count": 20}
     ]
 
     with aioresponses() as m:
-        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 5})
-        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 10})
-        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 20})
-
         result = await truncate_history(messages, max_tokens=100)
         assert result == messages
 
-        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 10})
-        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 20})
         result = await truncate_history(messages, max_tokens=31)
-        assert result == [{"message": "b" * 10}, {"message": "c" * 20}]
+        assert result == [{"message": "b" * 10, "token_count": 10}, {"message": "c" * 20, "token_count": 20}]
 
-        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 20})
         result = await truncate_history(messages, max_tokens=20)
-        assert result == [{"message": "c" * 20}]
+        assert result == [{"message": "c" * 20, "token_count": 20}]
 
-        m.post(TOKENIZER_ENDPOINT, payload={"tokens": 20})
         result = await truncate_history(messages, max_tokens=19)
         assert result == []
 
 
 @pytest.mark.asyncio
 async def test_build_messages(monkeypatch):
-    # mock db.get_current_messages
-    monkeypatch.setattr(db, "get_current_messages", AsyncMock(return_value=[
-        {"message": "Hello", "role": "user"},
-        {"message": "Hi there", "role": "assistant"}
+    # mock get_current_messages
+    monkeypatch.setattr(llm, "get_current_messages", AsyncMock(return_value=[
+        {"message": "Hello", "role": "user", "token_count": 5},
+        {"message": "Hi there", "role": "assistant", "token_count": 6}
     ]))
-    monkeypatch.setattr(llm, "truncate_history", AsyncMock(side_effect=lambda msgs, max_tokens: msgs))
-    monkeypatch.setattr(qdrant, "find_similar", AsyncMock(return_value=["Арсен: Similar message"]))
-
+    monkeypatch.setattr(llm, "find_similar", AsyncMock(return_value=["Арсен: Similar message"]))
+    monkeypatch.setattr(llm, "get_character", AsyncMock(
+        return_value={"name": "Арсен", "card": "Character card", "first_summary": "First summary"}))
     messages = await llm.build_messages(123, "test query")
 
     assert len(messages) == 3  # системное сообщение + 2 сообщения из истории

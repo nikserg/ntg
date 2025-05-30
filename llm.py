@@ -4,11 +4,11 @@ import re
 
 import aiohttp
 
-import qdrant
 from characters import get_character
 from config import RUNPOD_API_KEY, RUNPOD_ENDPOINT, SYSTEM_PROMPT, \
     TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, CONTEXT_TOKEN_LIMIT
 from messages import get_current_messages
+from qdrant import find_similar
 from tokenizer import count_tokens
 
 
@@ -25,8 +25,7 @@ def clean_llm_response(text):
     """Удаляет нежелательные символы или строки из ответа."""
     text = text.replace("***", "").strip()
     # Удаляем строку, начинающуюся с имени
-    if text.startswith(r'\w+:'):
-        text = text[len(r"\w+:"):].strip()
+    text = re.sub(r'^\w+:\s*', '', text)
     # Обрезаем, если ответ заканчивается на '\n\nИмя:'
     text = re.split(r'\n\w+:', text)[0]
     # Обрезаем, если в конце есть объясниение
@@ -175,7 +174,7 @@ async def build_messages(chat_id, user_input):
     history = await truncate_history(history_records, CONTEXT_TOKEN_LIMIT)
 
     # Находим похожие сообщения из векторной БД
-    memories = await qdrant.find_similar(user_input, chat_id, current_context=[msg["message"] for msg in history])
+    memories = await find_similar(user_input, chat_id, current_context=[msg["message"] for msg in history])
 
     # Получаем персонажа
     character = await get_character(chat_id)
