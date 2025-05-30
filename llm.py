@@ -181,7 +181,8 @@ async def build_messages(chat_id, user_input):
     character = await get_character(chat_id)
 
     # Формируем системное сообщение
-    system_message = get_system_prompt(memories, character.get("card"), character.get("first_summary"))
+    system_message = get_system_prompt(memories, character.get("name"), character.get("card"),
+                                       character.get("first_summary"))
 
     # Формируем сообщения из истории чата
     messages = [system_message]
@@ -195,10 +196,10 @@ async def build_messages(chat_id, user_input):
     return messages
 
 
-def get_system_prompt(memories, character_card, summary):
+def get_system_prompt(memories, character_name, character_card, summary):
     """Возвращает системный промпт для LLM."""
     return {
         "role": "system",
-        "content": f"{SYSTEM_PROMPT}\n***\n{character_card}\n***\nКонтекст:\n{summary}" + (
+        "content": f"{SYSTEM_PROMPT}\n***\nТвой персонаж:{character_name}\n{character_card}\n***\nКонтекст:\n{summary}" + (
             f"\n***\nПредыдущие сообщения:\n" + "\n".join(memories) if memories else "")
     }
