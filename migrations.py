@@ -63,3 +63,82 @@ async def apply_migrations():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
+
+    # Миграция: создание таблицы диалогов и перенос данных из messages
+    await create_dialogues_migration()
+
+
+async def create_dialogues_migration():
+    """Создает таблицу диалогов и переносит данные из таблицы сообщений."""
+    # 1. Создаем таблицу диалогов
+    await execute_query("""
+        CREATE TABLE IF NOT EXISTS dialogues (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            chat_id BIGINT NOT NULL,
+            is_current BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_dialogues_chat_current (chat_id, is_current)
+        );
+    """)
+
+    # 2. Получаем уникальные пары chat_id и is_current из сообщений
+    await execute_query("""
+        INSERT INTO dialogues (chat_id, is_current)
+        SELECT DISTINCT chat_id, is_current FROM messages;
+    """)
+
+    # 3. Добавляем столбец dialogue_id в таблицу messages
+    try:
+        await execute_query("""
+            ALTER TABLE messages ADD COLUMN dialogue_id INT NULL,
+            ADD INDEX idx_messages_dialogue_id (dialogue_id);
+        """)
+    except Exception as e:
+        logging.info(f"При добавлении столбца dialogue_id: {e}")
+
+    # 4. Обновляем сообщения, чтобы они указывали на соответствующие диалоги
+    await execute_query("""
+        UPDATE messages m
+        JOIN dialogues d ON m.chat_id = d.chat_id AND m.is_current = d.is_current
+        SET m.dialogue_id = d.id;
+    """)
+
+    # Удаляем индекс idx_messages_chat_current, так как он больше не нужен
+    try:
+        await execute_query("""
+            ALTER TABLE messages DROP INDEX idx_messages_chat_current;
+        """)
+    except Exception as e:
+        logging.info(f"При удалении индекса idx_messages_chat_current: {e}")
+
+    # Удаляем индекс idx_messages_chat_time, так как он больше не нужен
+    try:
+        await execute_query("""
+            ALTER TABLE messages DROP INDEX idx_messages_chat_time;
+        """)
+    except Exception as e:
+        logging.info(f"При удалении индекса idx_messages_chat_time: {e}")
+
+    # 5. Удаляем столбец is_current из таблицы messages
+    try:
+        await execute_query("""
+            ALTER TABLE messages DROP COLUMN is_current;
+        """)
+    except Exception as e:
+        logging.info(f"При удалении столбца is_current: {e}")
+
+    # Удаляем chat_id из таблицы dialogues, так как он больше не нужен - вместо него используется dialogue_id в messages
+    try:
+        await execute_query("""
+            ALTER TABLE dialogues DROP COLUMN chat_id;
+        """)
+    except Exception as e:
+        logging.info(f"При удалении столбца chat_id из таблицы dialogues: {e}")
+
+    # Создаем индекс для dialogue_id и time в таблице messages
+    try:
+        await execute_query("""
+            CREATE INDEX idx_messages_dialogue_time ON messages (dialogue_id, time);
+        """)
+    except Exception as e:
+        logging.info(f"При создании индекса idx_messages_dialogue_time: {e}")
