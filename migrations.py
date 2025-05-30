@@ -66,7 +66,42 @@ async def apply_migrations():
 
     # Миграция: создание таблицы диалогов и перенос данных из messages
     await create_dialogues_migration()
+    await fix_dialogues_chat_id()
 
+
+async def fix_dialogues_chat_id():
+    # Создаем столбец chat_id в таблице dialogues, если его нет
+    try:
+        await execute_query("""
+            ALTER TABLE dialogues ADD COLUMN chat_id BIGINT NULL;
+        """)
+    except Exception as e:
+        # Игнорируем ошибку, если столбец уже существует
+        logging.info(f"При добавлении столбца chat_id в таблицу dialogues: {e}")
+    # Переносим chat_id из messages в dialogues
+    await execute_query("""
+        UPDATE dialogues d
+        JOIN messages m ON d.id = m.dialogue_id
+        SET d.chat_id = m.chat_id
+        WHERE d.chat_id IS NULL
+    """)
+    # Удаляем некорректный индекс idx_dialogues_chat_current, если он существует
+    try:
+        await execute_query("""
+            ALTER TABLE dialogues DROP INDEX idx_dialogues_chat_current;
+        """)
+    except Exception as e:
+        # Игнорируем ошибку, если индекс не существует
+        logging.info(f"При удалении индекса idx_dialogues_chat_current: {e}")
+
+    # Создаем индекс для chat_id в таблице dialogues
+    try:
+        await execute_query("""
+            CREATE INDEX idx_dialogues_chat_is_current ON dialogues (chat_id, is_current);
+        """)
+    except Exception as e:
+        # Игнорируем ошибку, если индекс уже существует
+        logging.info(f"При создании индекса idx_dialogues_chat: {e}")
 
 async def create_dialogues_migration():
     """Создает таблицу диалогов и переносит данные из таблицы сообщений."""
