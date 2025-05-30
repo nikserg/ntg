@@ -1,7 +1,8 @@
 from config import (SUBSCRIBE_INVITE, ADDITIONAL_MESSAGES_PER_DAY_FOR_USEFUL_FEEDBACK,
                     ADDITIONAL_MESSAGES_PER_DAY_FOR_FEEDBACK, MAX_MESSAGES_PER_DAY,
-                    ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED, BOT_NAME)
+                    ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED, BOT_NAME, ADDITIONAL_MESSAGES_PER_DAY_FOR_SUBSCRIPTION)
 from db import get_db_connection, get_or_create_user
+from subscribe_check import check_subscription
 
 
 # Асинхронное получение количества сообщений за день
@@ -55,7 +56,10 @@ async def get_user_daily_limit(chat_id):
     # Проверяем наличие фидбека
     has_feedback, is_useful = await get_feedback_bonus(chat_id)
     feedback_bonus = ADDITIONAL_MESSAGES_PER_DAY_FOR_USEFUL_FEEDBACK if is_useful else ADDITIONAL_MESSAGES_PER_DAY_FOR_FEEDBACK if has_feedback else 0
-    return MAX_MESSAGES_PER_DAY + (ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED * bonus_count) + feedback_bonus
+    # Проверяем, подписан ли пользователь на канал
+    subscription_bonus = ADDITIONAL_MESSAGES_PER_DAY_FOR_SUBSCRIPTION if await check_subscription(chat_id) else 0
+    return MAX_MESSAGES_PER_DAY + (
+                ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED * bonus_count) + feedback_bonus + subscription_bonus
 
 
 async def handle_command(chat_id):
@@ -71,17 +75,25 @@ async def handle_command(chat_id):
     if has_feedback:
         feedback_bonus = ADDITIONAL_MESSAGES_PER_DAY_FOR_USEFUL_FEEDBACK if is_useful else ADDITIONAL_MESSAGES_PER_DAY_FOR_FEEDBACK
         feedback_type = "полезный" if is_useful else "обычный"
-        feedback_bonus_str = f"• Бонус за отзыв: +{feedback_bonus} ({feedback_type})\n"
+        feedback_bonus_str = f"• Бонус за отзыв: +{feedback_bonus} ({feedback_type})"
 
     # Вычисляем базовый лимит и бонус от приглашений
     base_limit = MAX_MESSAGES_PER_DAY
     invite_bonus = ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED * bonus_count
 
+    # Проверяем подписку
+    is_subscribed = await check_subscription(chat_id)
+    if is_subscribed:
+        subscription_bonus_str = f"• Бонус за подписку: +{ADDITIONAL_MESSAGES_PER_DAY_FOR_SUBSCRIPTION}"
+    else:
+        subscription_bonus_str = "• Бонус за подписку: 0 (нет подписки на канал)"
+
     return (
         f"Ваш лимит сообщений на сегодня: {daily_limit}\n"
         f"• Базовый лимит: {base_limit}\n"
         f"• Бонус за приглашения: +{invite_bonus} ({invited_count} приглашённых, учитывается максимум 5)\n"
-        f"{feedback_bonus_str}"
+        f"{feedback_bonus_str}\n"
+        f"{subscription_bonus_str}\n"
         f"Использовано сегодня: {daily_message_count} из {daily_limit}\n"
         f"\n"
         f"Используйте /invite для получения ссылки-приглашения и увеличения лимита.\n"

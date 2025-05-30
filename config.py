@@ -37,10 +37,12 @@ QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "chat")
 MAX_MESSAGES_PER_DAY = int(os.getenv("MAX_MESSAGES_PER_DAY", 50))
 ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED = int(os.getenv("ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED", 100))
+ADDITIONAL_MESSAGES_PER_DAY_FOR_SUBSCRIPTION = int(os.getenv("ADDITIONAL_MESSAGES_PER_DAY_FOR_SUBSCRIPTION", 15))
 SUBSCRIBE_INVITE = os.getenv("SUBSCRIBE_INVITE", "")
 EXCLUDE_WORDS = json.loads(os.getenv("EXCLUDE_WORDS", "[]"))
 TOKENIZER_ENDPOINT = os.getenv("TOKENIZER_ENDPOINT", "")  # HTTP для токенизации текста
 EMBEDDER_ENDPOINT = os.getenv("EMBEDDER_ENDPOINT", "")  # HTTP для векторизации текста
+SUBSCRIBE_CHECK_ENDPOINT = os.getenv("SUBSCRIBE_CHECK_ENDPOINT", "")
 VECTOR_SIZE = 384  # Размерность для all-MiniLM-L6-v2
 # Асинхронное подключение к MySQL
 db_config = {
@@ -65,12 +67,6 @@ def print_config():
                  f"REPEAT_PENALTY: {REPEAT_PENALTY}\n"
                  f"REPLY_MAX_TOKENS: {REPLY_MAX_TOKENS}\n"
                  f"RUNPOD_API_KEY: {RUNPOD_API_KEY}\n"
-                 f"QDRANT_HOST: {QDRANT_HOST}\n"
-                 f"QDRANT_PORT: {QDRANT_PORT}\n"
                  f"QDRANT_COLLECTION_NAME: {QDRANT_COLLECTION_NAME}\n"
                  f"VECTOR_SIZE: {VECTOR_SIZE}\n"
-                 f"MYSQL_HOST: {db_config['host']}\n"
-                 f"MYSQL_USER: {db_config['user']}\n"
-                 f"MYSQL_DATABASE: {db_config['database']}\n"
-                 f"MYSQL_PASSWORD: {'***' if db_config['password'] else 'не указано'}"
                  )
