@@ -1,3 +1,4 @@
+import base64
 import logging
 
 import qdrant
@@ -52,7 +53,9 @@ async def handle_command(chat_id, user_input):
 
     # Сбрасываем историю сообщений и отправляем приветственное сообщение
     await reset_history_in_db(chat_id)
-    return await add_first_messages_to_db(chat_id)
+
+    # Возвращаем текст ответа и картинку
+    return await add_first_messages_to_db(chat_id), await get_random_start_image()
 
 
 async def add_first_messages_to_db(chat_id):
@@ -61,3 +64,32 @@ async def add_first_messages_to_db(chat_id):
                        "user")  # Это сообщение не будет видно пользователю, но сохранится в БД
     await save_message(chat_id, remove_newlines(first_message), "assistant")
     return FIRST_MESSAGE.replace("\\n", "\n")
+
+
+async def get_random_start_image():
+    """
+    Получает случайное изображение из базы данных и возвращает его в виде base64-строки.
+
+    Returns:
+        str: base64-encoded image string or None if no images found
+    """
+    try:
+        async with (await get_db_connection()) as conn:
+            async with conn.cursor() as cursor:
+                # Выбираем случайное изображение
+                await cursor.execute("SELECT content FROM images ORDER BY RAND() LIMIT 1")
+                result = await cursor.fetchone()
+
+                if not result:
+                    logging.warning("Изображения не найдены в базе данных")
+                    return None
+
+                # Преобразуем бинарные данные в base64
+                binary_data = result[0]
+                base64_data = base64.b64encode(binary_data).decode('utf-8')
+
+                return base64_data
+
+    except Exception as e:
+        logging.error(f"Ошибка при получении случайного изображения: {e}")
+        return None
