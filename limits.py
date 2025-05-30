@@ -86,7 +86,7 @@ async def handle_command(chat_id):
     if is_subscribed:
         subscription_bonus_str = f"• Бонус за подписку: +{ADDITIONAL_MESSAGES_PER_DAY_FOR_SUBSCRIPTION}"
     else:
-        subscription_bonus_str = "• Бонус за подписку: 0 (нет подписки на канал)"
+        subscription_bonus_str = "• Бонус за подписку: 0 (пока нет подписки на канал. Если вы уже подписались, лимит будет обновлен в течение 3 минут)"
 
     return (
         f"Ваш лимит сообщений на сегодня: {daily_limit}\n"
