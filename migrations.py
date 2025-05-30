@@ -64,8 +64,6 @@ async def apply_migrations():
         );
     """)
 
-    # Миграция: создание таблицы диалогов и перенос данных из messages
-    await create_dialogues_migration()
     await fix_dialogues_chat_id()
 
 
