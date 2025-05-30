@@ -58,7 +58,7 @@ async def save_message(chat_id, message, role):
     dialogue_id = await get_current_dialogue(chat_id)
     query = """
             INSERT INTO messages (dialogue_id, message, role)
-            VALUES (%s, %s, %s, %s) \
+            VALUES (%s, %s, %s) \
             """
     await execute_query(query, (dialogue_id, message, role))
 
