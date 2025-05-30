@@ -39,8 +39,7 @@ TOKENIZER_ENDPOINT = os.getenv("TOKENIZER_ENDPOINT", "")  # HTTP для токе
 EMBEDDER_ENDPOINT = os.getenv("EMBEDDER_ENDPOINT", "")  # HTTP для векторизации текста
 SUBSCRIBE_CHECK_ENDPOINT = os.getenv("SUBSCRIBE_CHECK_ENDPOINT", "")
 VECTOR_SIZE = 384  # Размерность для all-MiniLM-L6-v2
-# Асинхронное подключение к MySQL
-db_config = {
+DB_CONFIG = {
     "host": os.getenv("MYSQL_HOST", "localhost"),
     "user": os.getenv("MYSQL_USER", "root"),
     "password": os.getenv("MYSQL_PASSWORD", ""),

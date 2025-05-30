@@ -3,7 +3,7 @@ import logging
 
 import aiomysql
 
-from config import db_config
+from config import DB_CONFIG
 
 
 async def get_db_connection(retries=3, delay=1):
@@ -11,10 +11,10 @@ async def get_db_connection(retries=3, delay=1):
     for attempt in range(1, retries + 1):
         try:
             return await aiomysql.connect(
-                host=db_config["host"],
-                user=db_config["user"],
-                password=db_config["password"],
-                db=db_config["database"],
+                host=DB_CONFIG["host"],
+                user=DB_CONFIG["user"],
+                password=DB_CONFIG["password"],
+                db=DB_CONFIG["database"],
                 autocommit=True
             )
         except Exception as e:
