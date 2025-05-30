@@ -2,10 +2,11 @@ import base64
 import logging
 
 import qdrant
-from config import FIRST_MESSAGE, USER_FIRST_MESSAGE
-from db import get_db_connection, save_message, execute_query
-from db import get_or_create_user
+from characters import get_character
+from db import get_db_connection, execute_query
+from messages import save_message
 from sanitizer import remove_newlines
+from users import get_or_create_user
 
 
 async def reset_history_in_db(chat_id):
@@ -59,10 +60,11 @@ async def handle_command(chat_id, user_input):
 
 
 async def add_first_messages_to_db(chat_id):
-    first_message = FIRST_MESSAGE.replace('\\n', '\n')
-    await save_message(chat_id, USER_FIRST_MESSAGE, "user")  # Это сообщение только сохранится в БД
+    character = await get_character(chat_id)
+    first_message = character["first_message"]
+    await save_message(chat_id, character["user_first_message"], "user")  # Это сообщение только сохранится в БД
     await save_message(chat_id, remove_newlines(first_message), "assistant")
-    return FIRST_MESSAGE.replace("\\n", "\n")
+    return first_message
 
 
 async def get_random_start_image():

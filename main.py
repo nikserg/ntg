@@ -13,7 +13,7 @@ import migrations
 import qdrant
 import start
 from config import print_config, EXCLUDE_WORDS
-from db import save_message, get_current_messages
+from messages import save_message, get_current_messages
 from sanitizer import remove_newlines, exclude_words_from_input
 
 # Настройка логирования

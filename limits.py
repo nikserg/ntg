@@ -1,8 +1,10 @@
 from config import (SUBSCRIBE_INVITE, ADDITIONAL_MESSAGES_PER_DAY_FOR_USEFUL_FEEDBACK,
                     ADDITIONAL_MESSAGES_PER_DAY_FOR_FEEDBACK, MAX_MESSAGES_PER_DAY,
-                    ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED, BOT_NAME, ADDITIONAL_MESSAGES_PER_DAY_FOR_SUBSCRIPTION)
-from db import get_db_connection, get_or_create_user
+                    ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED, BOT_NAME,
+                    ADDITIONAL_MESSAGES_PER_DAY_FOR_SUBSCRIPTION)
+from db import get_db_connection
 from subscribe_check import check_subscription
+from users import get_or_create_user
 
 
 # Асинхронное получение количества сообщений за день

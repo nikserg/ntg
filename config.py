@@ -18,13 +18,8 @@ RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT", "")
 CONTEXT_LENGTH = int(os.getenv("CONTEXT_LENGTH", 4096))
 CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 2500))
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
-CHARACTER_CARD = os.getenv("CHARACTER_CARD", "")
-CHARACTER_NAME = os.getenv("CHARACTER_NAME", "Арсен")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT",
                           "Ты виртуальный помощник, который помогает пользователям с их вопросами и задачами. Дружелюбный и отзывчивый.")
-FIRST_MESSAGE = os.getenv("FIRST_MESSAGE", f"Привет, я {CHARACTER_NAME}.")
-USER_FIRST_MESSAGE = os.getenv("USER_FIRST_MESSAGE",
-                               "")  # Это сообщение, которое отправляется в историю сообщений от лица пользователя, чтобы не сломать шаблон инструкции LLM. Сам пользователь его не увидит, но в БД оно будет сохранено.
 TEMPERATURE = float(os.getenv("TEMPERATURE", 0.7))
 MIN_P = float(os.getenv("MIN_P", 0.1))
 TOP_P = float(os.getenv("TOP_P", 0.9))
@@ -59,7 +54,6 @@ def print_config():
                  f"RUNPOD_ENDPOINT: {RUNPOD_ENDPOINT}\n"
                  f"CONTEXT_LENGTH: {CONTEXT_LENGTH}\n"
                  f"CONTEXT_TOKEN_LIMIT: {CONTEXT_TOKEN_LIMIT}\n"
-                 f"CHARACTER_CARD: {CHARACTER_CARD}\n"
                  f"SYSTEM_PROMPT: {SYSTEM_PROMPT}\n"
                  f"TEMPERATURE: {TEMPERATURE}\n"
                  f"MIN_P: {MIN_P}\n"

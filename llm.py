@@ -4,10 +4,11 @@ import re
 
 import aiohttp
 
-import db
 import qdrant
-from config import RUNPOD_API_KEY, CHARACTER_NAME, RUNPOD_ENDPOINT, SYSTEM_PROMPT, CHARACTER_CARD, \
+from characters import get_character
+from config import RUNPOD_API_KEY, RUNPOD_ENDPOINT, SYSTEM_PROMPT, \
     TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, CONTEXT_TOKEN_LIMIT
+from messages import get_current_messages
 from tokenizer import count_tokens
 
 
@@ -23,9 +24,9 @@ def trim_incomplete_sentence(text):
 def clean_llm_response(text):
     """Удаляет нежелательные символы или строки из ответа."""
     text = text.replace("***", "").strip()
-    # Удаляем строку, начинающуюся с имени персонажа
-    if text.startswith(f"{CHARACTER_NAME}:"):
-        text = text[len(f"{CHARACTER_NAME}:"):].strip()
+    # Удаляем строку, начинающуюся с имени
+    if text.startswith(r'\w+:'):
+        text = text[len(r"\w+:"):].strip()
     # Обрезаем, если ответ заканчивается на '\n\nИмя:'
     text = re.split(r'\n\w+:', text)[0]
     # Обрезаем, если в конце есть объясниение
@@ -162,12 +163,13 @@ async def truncate_history(messages, max_tokens):
 
     return truncated
 
+
 async def build_messages(chat_id, user_input):
     """
     Формирует список сообщений для LLM из истории чата, векторной БД и системного промпта.
     """
     # Получаем историю чата из MySQL
-    history_records = await db.get_current_messages(chat_id)
+    history_records = await get_current_messages(chat_id)
 
     # Обрезаем историю до лимита токенов
     history = await truncate_history(history_records, CONTEXT_TOKEN_LIMIT)
@@ -175,8 +177,11 @@ async def build_messages(chat_id, user_input):
     # Находим похожие сообщения из векторной БД
     memories = await qdrant.find_similar(user_input, chat_id, current_context=[msg["message"] for msg in history])
 
+    # Получаем персонажа
+    character = await get_character(chat_id)
+
     # Формируем системное сообщение
-    system_message = get_system_prompt(memories)
+    system_message = get_system_prompt(memories, character.get("card"), character.get("first_summary"))
 
     # Формируем сообщения из истории чата
     messages = [system_message]
@@ -190,10 +195,10 @@ async def build_messages(chat_id, user_input):
     return messages
 
 
-def get_system_prompt(memories):
+def get_system_prompt(memories, character_card, summary):
     """Возвращает системный промпт для LLM."""
     return {
         "role": "system",
-        "content": f"{SYSTEM_PROMPT}\n***\n{CHARACTER_CARD}" + (
+        "content": f"{SYSTEM_PROMPT}\n***\n{character_card}\n***\nКонтекст:\n{summary}" + (
             f"\n***\nПредыдущие сообщения:\n" + "\n".join(memories) if memories else "")
     }
