@@ -57,10 +57,10 @@ async def save_message(chat_id, message, role):
     # Получаем текущий диалог для чата
     dialogue_id = await get_current_dialogue(chat_id)
     query = """
-            INSERT INTO messages (dialogue_id, message, role, chat_id)
-            VALUES (%s, %s, %s, %s) \
+            INSERT INTO messages (dialogue_id, message, role)
+            VALUES (%s, %s, %s) \
             """
-    await execute_query(query, (dialogue_id, message, role, chat_id))
+    await execute_query(query, (dialogue_id, message, role))
 
 
 async def get_current_dialogue(chat_id):
