@@ -200,6 +200,6 @@ def get_system_prompt(memories, character_name, character_card, summary):
     """Возвращает системный промпт для LLM."""
     return {
         "role": "system",
-        "content": f"{SYSTEM_PROMPT}\n***\nТвой персонаж: {character_name}\n{character_card}\n***\nКонтекст:\n{summary}" + (
+        "content": f"{SYSTEM_PROMPT}\n***\nТвой персонаж: {character_name}\n{character_card}\n***\nСюжет:\n{summary}" + (
             f"\n***\nПредыдущие сообщения:\n" + "\n".join(memories) if memories else "")
     }
