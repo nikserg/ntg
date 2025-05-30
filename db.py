@@ -90,7 +90,7 @@ async def get_current_dialogue(chat_id):
 async def get_current_messages(chat_id):
     """Получает текущие сообщения для чата"""
     query = """
-            SELECT messages.message, messages.role
+            SELECT messages.message, messages.role, messages.token_count
             FROM messages
             LEFT JOIN dialogues ON messages.dialogue_id = dialogues.id
             WHERE dialogues.chat_id = %s
