@@ -6,8 +6,9 @@ import aiohttp
 
 import db
 import qdrant
-from config import RUNPOD_API_KEY, CHARACTER_NAME, TOKENIZER_ENDPOINT, RUNPOD_ENDPOINT, SYSTEM_PROMPT, CHARACTER_CARD, \
+from config import RUNPOD_API_KEY, CHARACTER_NAME, RUNPOD_ENDPOINT, SYSTEM_PROMPT, CHARACTER_CARD, \
     TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, CONTEXT_TOKEN_LIMIT
+from tokenizer import count_tokens
 
 
 def trim_incomplete_sentence(text):
@@ -149,21 +150,10 @@ async def truncate_history(messages, max_tokens):
     truncated = []
 
     for msg in reversed(messages):
-        # Обращаемся к отдельному сервису для токенизации, повторяем попытки при ошибках
-        async with aiohttp.ClientSession() as session:
-            retries = 3
-            for attempt in range(retries):
-                try:
-                    async with session.post(TOKENIZER_ENDPOINT, json={"text": msg["message"]}, timeout=30) as response:
-                        response.raise_for_status()
-                        data = await response.json()
-                        msg_tokens = data.get("tokens", 0)
-                        break
-                except Exception as e:
-                    logging.error(f"Ошибка при токенизации сообщения: {e}")
-                    if attempt == retries - 1:
-                        msg_tokens = len(msg["message"])  # Если не удалось получить токены, используем длину сообщения
-                    await asyncio.sleep(2 * (attempt + 1))  # экспоненциальная задержка
+        msg_tokens = msg["token_count"]
+        if msg_tokens is None or msg_tokens <= 0:
+            # Если токены не посчитаны, используем функцию для подсчёта
+            msg_tokens = await count_tokens(msg["message"])
 
         if total_tokens + msg_tokens > max_tokens:
             break
@@ -171,7 +161,6 @@ async def truncate_history(messages, max_tokens):
         total_tokens += msg_tokens
 
     return truncated
-
 
 async def build_messages(chat_id, user_input):
     """
