@@ -20,20 +20,17 @@ async def test_truncate_history(monkeypatch):
 
     with aioresponses() as m:
         # Mock CONTEXT_TOKEN_LIMIT to a specific value
-        monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 100)
-        result = await summarize._truncate_history(messages)
+        result = await summarize._truncate_history(messages, 100)
         assert result == messages
 
-        monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 31)
-        result = await summarize._truncate_history(messages)
+        result = await summarize._truncate_history(messages, 31)
         assert result == [{"message": "b" * 10, "token_count": 10}, {"message": "c" * 20, "token_count": 20}]
 
-        monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 20)
-        result = await summarize._truncate_history(messages)
+        result = await summarize._truncate_history(messages, 20)
         assert result == [{"message": "c" * 20, "token_count": 20}]
 
         monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 19)
-        result = await summarize._truncate_history(messages)
+        result = await summarize._truncate_history(messages, 19)
         assert result == []
 
 
@@ -70,13 +67,14 @@ async def test_mark_messages_as_summarized(monkeypatch):
     # Mock the database operation
     mock_execute_query = AsyncMock()
     monkeypatch.setattr(summarize, "execute_query", mock_execute_query)
+    monkeypatch.setattr(summarize, "get_current_dialogue", AsyncMock(return_value=1))
 
-    await summarize.mark_messages_as_summarized(messages)
+    await summarize.mark_messages_as_summarized(1, messages)
 
     # Check if execute_query was called with the correct SQL and parameters
     mock_execute_query.assert_called_once_with(
-        "UPDATE messages SET summarized = 1 WHERE id IN (%s, %s)",
-        [1, 2]
+        "UPDATE messages SET summarized = 1 WHERE dialogue_id = %s AND id <= %s",
+        (1, 2)
     )
 
 
