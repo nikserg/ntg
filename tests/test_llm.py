@@ -11,84 +11,28 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import llm
 
 
-def test_clean_llm_response():
-    response = "Это тестовый ответ. С уважением, Арсен."
+@pytest.mark.parametrize("response,expected", [
+    ("Это тестовый ответ. С уважением, Арсен.", "Это тестовый ответ. С уважением, Арсен."),
+    ("Это тестовый ответ *** С уважением, Арсен.", "Это тестовый ответ С уважением, Арсен."),
+    ("Арсен: Это тестовый ответ", "Это тестовый ответ"),
+    ("Ответ &amp; ответ", "Ответ & ответ"),
+    ("Ответ &amp;#34; ответ", 'Ответ " ответ'),
+    ("Ответ &#34; ответ", 'Ответ " ответ'),
+    ("ой.&lt;/s&gt; *", "ой. *"),
+    ("Привет [ой] <ой>.", "Привет ой ой."),
+    ("Привет! Я тебя не заметил.\n\nАрсен: Привет, Вася! Как дела?", "Привет! Я тебя не заметил."),
+    ("*улыбается* Ой. Просто *да*\n\nНезнакомец: ...\n\nАрсен: *кивает* *...*", "*улыбается* Ой. Просто *да*"),
+    ("*улыбается* Привет! **ОБЪЯСНЕНИЕ:**\n- 123\n- 456", "*улыбается* Привет!"),
+    ("*улыбается* Привет! *ОБЪЯСНЕНИЕ:*\n- 123\n- 456", "*улыбается* Привет!"),
+    ("*привет* Привет (Нет) Да. (Сценарий продолжается с", "*привет* Привет (Нет) Да."),
+    ("Это тестовое предложение\n*", "Это тестовое предложение"),
+    ("Это тестовое предложение ** вот так **", "Это тестовое предложение * вот так *"),
+    ("*это* Полностью... Нормальный, да. *ответ* ...да. да.", "*это* Полностью... Нормальный, да. *ответ* ...да. да."),
+    ("*привет* Привет? Привет. Я говорю: *Арсен: *да* Привет... Да.", "*привет* Привет? Привет.")
+])
+def test_clean_llm_response(response, expected):
     cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "Это тестовый ответ. С уважением, Арсен."
-
-    response = "Это тестовый ответ *** С уважением, Арсен."
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "Это тестовый ответ С уважением, Арсен."
-
-    response = "Арсен: Это тестовый ответ"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "Это тестовый ответ"
-
-    response = "Ответ &amp; ответ"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "Ответ & ответ"
-
-    response = "Ответ &amp;#34; ответ"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == 'Ответ " ответ'
-
-    response = "Ответ &#34; ответ"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == 'Ответ " ответ'
-
-    response = "ой.&lt;/s&gt; *"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "ой. *"
-
-    response = "Привет [ой] <ой>."
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "Привет ой ой."
-
-    response = "Привет! Я тебя не заметил.\n\nАрсен: Привет, Вася! Как дела?"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "Привет! Я тебя не заметил."
-
-    response = (
-        "*улыбается* Ой. "
-        "Просто *да*\n\n"
-        "Незнакомец: ...\n\n"
-        "Арсен: *кивает* "
-        "*...*"
-    )
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "*улыбается* Ой. Просто *да*"
-
-    response = (
-        "*улыбается* Привет! **ОБЪЯСНЕНИЕ:**\n"
-        "- 123\n"
-        "- 456"
-    )
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "*улыбается* Привет!"
-
-    response = (
-        "*улыбается* Привет! *ОБЪЯСНЕНИЕ:*\n"
-        "- 123\n"
-        "- 456"
-    )
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "*улыбается* Привет!"
-
-    response = "*привет* Привет (Нет) Да. (Сценарий продолжается с"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "*привет* Привет (Нет) Да."
-
-    response = "Это тестовое предложение\n*"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "Это тестовое предложение"
-
-    response = "Это тестовое предложение ** вот так **"
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "Это тестовое предложение * вот так *"
-
-    response = "*это* Полностью... Нормальный, да. *ответ* ...да. да."
-    cleaned_response = llm._clean_llm_response(response)
-    assert cleaned_response == "*это* Полностью... Нормальный, да. *ответ* ...да. да."
+    assert cleaned_response == expected
 
 
 def test_get_system_prompt():
