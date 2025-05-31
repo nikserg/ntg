@@ -35,6 +35,7 @@ async def _build_messages(chat_id, user_input):
     # Если сообщения начинают обрезаться, делаем пересказ
     summary = await summarize.get_summary(chat_id)
     if len(history) < len(message_history):
+        # Получаем пересказ и обрезанную историю сообщений
         summary, history = await _make_new_summary(summary, chat_id, message_history)
 
     # Находим похожие сообщения из векторной БД

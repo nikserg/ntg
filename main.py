@@ -77,7 +77,8 @@ async def handle_internal_request(request):
         logging.info(f"Ответ пользователю {chat_id}: {reply}")
         return answer(reply)
     except Exception as e:
-        logging.error(f"Ошибка при обработке /internal: {e}")
+        # Вывести в лог ошибку и стектрейс
+        logging.error(f"Ошибка при обработке /internal: {str(e)}")
         return answer(f"Ошибка: {str(e)}", status=500)
 
 
