@@ -34,6 +34,8 @@ async def test_find_similar_empty(monkeypatch):
     # Создаем мок для qdrant_client.search
     mock_search = MagicMock(return_value=[])
     monkeypatch.setattr(qdrant.qdrant_client, "search", mock_search)
+    monkeypatch.setattr(qdrant, "get_character_name", AsyncMock(return_value="Арсен"))
+    monkeypatch.setattr(qdrant, "embed_text", AsyncMock(return_value=np.ones(384, dtype="float32")))
 
     # Тестируем функцию
     result = await qdrant.find_similar("тест", chat_id)
@@ -69,6 +71,7 @@ async def test_find_similar_found(monkeypatch):
 
     # Мокируем embed_text и qdrant_client.search
     monkeypatch.setattr(qdrant, "embed_text", AsyncMock(return_value=np.ones(384, dtype="float32")))
+    monkeypatch.setattr(qdrant, "get_character_name", AsyncMock(return_value="Арсен"))
     monkeypatch.setattr(qdrant.qdrant_client, "search", MagicMock(return_value=mock_results))
 
     # Тестируем функцию
@@ -95,6 +98,7 @@ async def test_find_similar_with_context_filter(monkeypatch):
 
     # Мокируем embed_text и qdrant_client.search
     monkeypatch.setattr(qdrant, "embed_text", AsyncMock(return_value=np.ones(384, dtype="float32")))
+    monkeypatch.setattr(qdrant, "get_character_name", AsyncMock(return_value="Арсен"))
     monkeypatch.setattr(qdrant.qdrant_client, "search", MagicMock(return_value=mock_results))
 
     # Тестируем функцию без фильтрации контекста

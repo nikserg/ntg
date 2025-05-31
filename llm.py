@@ -179,7 +179,7 @@ def _clean_llm_response(text):
     # Убираем двойные звездочки
     text = re.sub(r"\*\*", '*', text)
     # Убираем одну звездочку, если она идет в конце сразу после переноса строки
-    text = re.sub(r"\n\*$", '\n', text)
+    text = re.sub(r"\n\*$", '', text)
 
     # Убираем неоконченные предложения
     text = _trim_incomplete_sentence(text)

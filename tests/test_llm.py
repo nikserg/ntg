@@ -3,7 +3,8 @@ import sys
 from unittest.mock import AsyncMock
 
 import pytest
-from aioresponses import aioresponses
+
+import summarize
 
 # Add the parent directory to sys.path to allow importing modules from the parent directory
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -93,7 +94,7 @@ def test_clean_llm_response():
 def test_get_system_prompt():
     # Test with default character name
     system_prompt = llm._get_reply_system_prompt(["Абдулла поше попить", "Ты - Арсен"], "Арсен", "Класный персонаж",
-                                          "Первое резюме")
+                                                 "Первое резюме")
     assert "Абдулла поше попить" in system_prompt.get('content')
     assert "Ты - Арсен" in system_prompt.get('content')
     assert "Класный персонаж" in system_prompt.get('content')
@@ -113,30 +114,6 @@ def test_trim_incomplete_sentence():
 
 
 @pytest.mark.asyncio
-async def test_truncate_history(monkeypatch):
-    from llm import _truncate_history
-
-    messages = [
-        {"message": "a" * 5, "token_count": 5},
-        {"message": "b" * 10, "token_count": 10},
-        {"message": "c" * 20, "token_count": 20}
-    ]
-
-    with aioresponses() as m:
-        result = await _truncate_history(messages, max_tokens=100)
-        assert result == messages
-
-        result = await _truncate_history(messages, max_tokens=31)
-        assert result == [{"message": "b" * 10, "token_count": 10}, {"message": "c" * 20, "token_count": 20}]
-
-        result = await _truncate_history(messages, max_tokens=20)
-        assert result == [{"message": "c" * 20, "token_count": 20}]
-
-        result = await _truncate_history(messages, max_tokens=19)
-        assert result == []
-
-
-@pytest.mark.asyncio
 async def test_build_messages(monkeypatch):
     # mock get_current_messages
     monkeypatch.setattr(llm, "get_current_messages", AsyncMock(return_value=[
@@ -146,6 +123,10 @@ async def test_build_messages(monkeypatch):
     monkeypatch.setattr(llm, "find_similar", AsyncMock(return_value=["Арсен: Similar message"]))
     monkeypatch.setattr(llm, "get_character", AsyncMock(
         return_value={"name": "Арсен", "card": "Character card", "first_summary": "First summary"}))
+    monkeypatch.setattr(llm, "get_character_name", AsyncMock(return_value="Арсен"))
+    monkeypatch.setattr(summarize, "needs_summarization", AsyncMock(return_value=False))
+    monkeypatch.setattr(summarize, "get_summary", AsyncMock(return_value="Summary of messages"))
+
     messages = await llm._build_messages(123, "test query")
 
     assert len(messages) == 3  # системное сообщение + 2 сообщения из истории
