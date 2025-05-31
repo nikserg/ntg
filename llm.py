@@ -5,7 +5,7 @@ import re
 import aiohttp
 
 import summarize
-from characters import get_character
+from characters import get_character, get_character_name
 from config import RUNPOD_API_KEY, RUNPOD_ENDPOINT, SYSTEM_PROMPT, \
     TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, CONTEXT_TOKEN_LIMIT, \
     SUMMARIZE_TARGET_TOKEN_LENGTH, SUMMARIZE_TEMPERATURE
@@ -17,8 +17,9 @@ from tokenizer import count_tokens
 async def run_llm(chat_id, cleaned_input):
     """Получает ответ от LLM на основе входящего сообщения пользователя."""
     messages = await _build_messages(chat_id, cleaned_input)
+    character_name = await get_character_name(chat_id)
     try:
-        return await _llm_request(messages)
+        return await _llm_request(messages, character_name=character_name, include_character_name=True)
     except Exception as e:
         logging.error(f"Ошибка при запросе к LLM: {e}. messages: {messages}")
         raise e
@@ -60,8 +61,13 @@ async def _make_new_summary(previous_summary, chat_id, message_history, characte
     summarize_messages_request = _make_messages_with_system_prompt(None, [{"role": "user", "message": user_message}])
     # Запрос к LLM для пересказа
     try:
-        summary = await _llm_request(summarize_messages_request, max_tokens=SUMMARIZE_TARGET_TOKEN_LENGTH,
-                                     temperature=SUMMARIZE_TEMPERATURE)
+        summary = await _llm_request(
+            messages=summarize_messages_request,
+            character_name=character_name,
+            include_character_name=False,
+            max_tokens=SUMMARIZE_TARGET_TOKEN_LENGTH,
+            temperature=SUMMARIZE_TEMPERATURE
+        )
     except Exception as e:
         logging.error(f"Ошибка при запросе пересказа в LLM: {e}")
         raise e
@@ -94,7 +100,9 @@ def _collapse_history_to_single_message(messages, previous_summary, character_na
             user_message += f"{character_name}: {msg['message']}\n"
     message = user_message.strip()
     # Добавляем промпт для пересказа
-    message += "\n***\nИгнорируй предыдущие инструкции. Ты - рассказчик истории. Составь краткий пересказ этого текста от третьего лица, упоминая имена персонажей, их внешность, динамику развития отношений и основные произошедшие события."
+    message += ("\n***\nДанный текст - ролевая игра. "
+                "Составь краткий пересказ этого текста от лица рассказчика, упоминая имена персонажей, их внешность, "
+                "динамику развития отношений и основные произошедшие события, учитывая также предыдущие события.")
     return message.strip()
 
 
@@ -195,12 +203,15 @@ def _clean_llm_response(text):
     return text.strip()
 
 
-async def _llm_request(messages, temperature=TEMPERATURE, top_p=TOP_P, min_p=MIN_P, repeat_penalty=REPEAT_PENALTY,
+async def _llm_request(messages, character_name, include_character_name=True, temperature=TEMPERATURE, top_p=TOP_P,
+                       min_p=MIN_P, repeat_penalty=REPEAT_PENALTY,
                        max_tokens=REPLY_MAX_TOKENS):
     """ Отправляет запрос к LLM и получает ответ."""
     payload = {
         "input": {
             "messages": messages,
+            "character_name": character_name,
+            "include_character_name": include_character_name,
             "params": {
                 "temperature": temperature,
                 "top_p": top_p,

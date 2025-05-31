@@ -6,6 +6,7 @@ from characters import get_character
 from config import SUMMARIZE_BUFFER_PERCENT
 from db import execute_query, get_db_connection
 from dialogues import get_current_dialogue
+from tokenizer import count_tokens
 
 
 def get_summarize_buffer(messages):
@@ -41,9 +42,10 @@ async def write_summary_to_db(chat_id, summary):
     Записывает пересказ в базу данных.
     """
     try:
+        tokens = await count_tokens(summary)
         dialogue_id = await get_current_dialogue(chat_id)
-        query = "INSERT INTO summaries (dialogue_id, summary) VALUES (%s, %s)"
-        await execute_query(query, (dialogue_id, summary))
+        query = "INSERT INTO summaries (dialogue_id, summary, token_count) VALUES (%s, %s, %s)"
+        await execute_query(query, (dialogue_id, summary, tokens))
     except Exception as e:
         logging.error("Ошибка при записи пересказа в базу данных: %s", e)
         raise e

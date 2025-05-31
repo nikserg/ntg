@@ -102,6 +102,8 @@ create table if not exists summaries
         on summaries (dialogue_id);
         
 alter table users add column additional_individual_limit int default 0 null;
+
+alter table summaries add column token_count int default 0 null;
     """
     # Разбиваем запросы на отдельные команды
     for query in queries.strip().split(';'):
