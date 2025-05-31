@@ -100,6 +100,8 @@ create table if not exists summaries
 
     create index idx_summaries_dialogue_id 
         on summaries (dialogue_id);
+        
+alter table users add column additional_individual_limit int default 0 null;
     """
     # Разбиваем запросы на отдельные команды
     for query in queries.strip().split(';'):
