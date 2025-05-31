@@ -26,12 +26,10 @@ async def mark_messages_as_summarized(messages):
     """
     Помечает сообщения как пересказанные в базе данных.
     """
-    query = "UPDATE messages SET summarized = 1 WHERE id IN %s"
-    message_ids = tuple(msg["id"] for msg in messages)
-    async with (await get_db_connection()) as conn:
-        async with conn.cursor() as cursor:
-            await cursor.execute(query, (message_ids))
-            await conn.commit()
+    message_ids = [msg["id"] for msg in messages]
+    placeholders = ', '.join(['%s'] * len(message_ids))
+    query = f"UPDATE messages SET summarized = 1 WHERE id IN ({placeholders})"
+    await execute_query(query, message_ids)
 
 
 async def write_summary_to_db(chat_id, summary):
