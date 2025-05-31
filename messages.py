@@ -25,7 +25,7 @@ async def get_current_messages(chat_id):
             LEFT JOIN dialogues ON messages.dialogue_id = dialogues.id
             WHERE dialogues.chat_id = %s
               AND dialogues.is_current = TRUE
-              AND message.summarized = 0 
+              AND messages.summarized = 0 
             ORDER BY messages.time ASC \
             """
     async with (await get_db_connection()) as conn:
