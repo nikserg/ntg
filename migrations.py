@@ -90,6 +90,16 @@ create table if not exists characters
 );
 
 alter table dialogues add column character_id int null;
+
+create table if not exists summaries
+(
+    id int auto_increment primary key,
+    dialogue_id int not null,
+    summary text not null
+);
+
+    create index idx_summaries_dialogue_id 
+        on summaries (dialogue_id);
     """
     # Разбиваем запросы на отдельные команды
     for query in queries.strip().split(';'):

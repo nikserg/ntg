@@ -15,8 +15,9 @@ if env_path.exists():
 # Считывание всех параметров из переменных окружения
 BOT_NAME = os.getenv("BOT_NAME", "nika_ai_chatbot")
 RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT", "")
-CONTEXT_LENGTH = int(os.getenv("CONTEXT_LENGTH", 4096))
-CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 2500))
+CONTEXT_TOKEN_LIMIT = int(
+    os.getenv("CONTEXT_TOKEN_LIMIT", 3000))  # Ставим чуть меньше, чем 4096, чтобы учесть неточность подсчета токенов
+SUMMARIZE_BUFFER_PERCENT = int(os.getenv("SUMMARIZE_BUFFER_PERCENT", 20))
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT",
                           "Ты виртуальный помощник, который помогает пользователям с их вопросами и задачами. Дружелюбный и отзывчивый.")
@@ -51,7 +52,6 @@ def print_config():
     """Функция для вывода текущих настроек конфигурации."""
     logging.info(f"Настройки бота:\n"
                  f"RUNPOD_ENDPOINT: {RUNPOD_ENDPOINT}\n"
-                 f"CONTEXT_LENGTH: {CONTEXT_LENGTH}\n"
                  f"CONTEXT_TOKEN_LIMIT: {CONTEXT_TOKEN_LIMIT}\n"
                  f"SYSTEM_PROMPT: {SYSTEM_PROMPT}\n"
                  f"TEMPERATURE: {TEMPERATURE}\n"
