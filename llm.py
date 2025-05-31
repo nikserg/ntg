@@ -33,7 +33,7 @@ async def _build_messages(chat_id, user_input):
     history = await _truncate_history(message_history, CONTEXT_TOKEN_LIMIT)
 
     # Если сообщения начинают обрезаться, делаем пересказ
-    summary = summarize.get_summary(chat_id)
+    summary = await summarize.get_summary(chat_id)
     if len(history) < len(message_history):
         summary, history = await _make_new_summary(summary, chat_id, message_history)
 
