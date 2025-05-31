@@ -1,5 +1,5 @@
 from config import ADDITIONAL_MESSAGES_PER_DAY_FOR_INVITED, BOT_NAME, SUBSCRIBE_INVITE
-from db import get_or_create_user
+from users import get_or_create_user
 
 
 async def handle_command(chat_id):

@@ -6,7 +6,8 @@ import aiohttp
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
-from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION_NAME, VECTOR_SIZE, EMBEDDER_ENDPOINT, CHARACTER_NAME
+from characters import get_character_name
+from config import QDRANT_HOST, QDRANT_PORT, QDRANT_COLLECTION_NAME, VECTOR_SIZE, EMBEDDER_ENDPOINT
 
 # Инициализация клиента Qdrant
 qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
@@ -59,15 +60,16 @@ async def embed_text(text):
 async def find_similar(text, chat_id, current_context=None, top_k=3):
     # Генерируем эмбеддинг для поиска
     query_vector = await embed_text(text)
+    character_name = await get_character_name(chat_id)
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
         None,
         find_similar_sync,
-        chat_id, query_vector, current_context, top_k
+        chat_id, query_vector, character_name, current_context, top_k
     )
 
 
-def find_similar_sync(chat_id, query_vector, current_context=None, top_k=3):
+def find_similar_sync(chat_id, query_vector, character_name, current_context=None, top_k=3):
     """Находит похожие сообщения в Qdrant, исключая те, что уже есть в контексте"""
     if current_context is None:
         current_context = []
@@ -87,7 +89,7 @@ def find_similar_sync(chat_id, query_vector, current_context=None, top_k=3):
         similar_msgs = []
         for result in search_result:
             candidate = result.payload["text"]
-            role_name = "Собеседник" if result.payload["role"] == "user" else CHARACTER_NAME
+            role_name = "Собеседник" if result.payload["role"] == "user" else character_name
             if candidate not in current_context:
                 similar_msgs.append(f"{role_name}: {candidate}")
                 if len(similar_msgs) >= top_k:

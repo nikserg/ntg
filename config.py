@@ -15,16 +15,14 @@ if env_path.exists():
 # Считывание всех параметров из переменных окружения
 BOT_NAME = os.getenv("BOT_NAME", "nika_ai_chatbot")
 RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT", "")
-CONTEXT_LENGTH = int(os.getenv("CONTEXT_LENGTH", 4096))
-CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 2500))
+CONTEXT_TOKEN_LIMIT = int(
+    os.getenv("CONTEXT_TOKEN_LIMIT", 3000))  # Ставим чуть меньше, чем 4096, чтобы учесть неточность подсчета токенов
+SUMMARIZE_BUFFER_PERCENT = int(os.getenv("SUMMARIZE_BUFFER_PERCENT", 30))
+SUMMARIZE_TARGET_TOKEN_LENGTH = int(os.getenv("SUMMARIZE_TARGET_TOKEN_LENGTH", 250))  # Количество токенов для пересказа
+SUMMARIZE_TEMPERATURE = float(os.getenv("SUMMARIZE_TEMPERATURE", 0.3))  # Температура для пересказа
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
-CHARACTER_CARD = os.getenv("CHARACTER_CARD", "")
-CHARACTER_NAME = os.getenv("CHARACTER_NAME", "Арсен")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT",
                           "Ты виртуальный помощник, который помогает пользователям с их вопросами и задачами. Дружелюбный и отзывчивый.")
-FIRST_MESSAGE = os.getenv("FIRST_MESSAGE", f"Привет, я {CHARACTER_NAME}.")
-USER_FIRST_MESSAGE = os.getenv("USER_FIRST_MESSAGE",
-                               "")  # Это сообщение, которое отправляется в историю сообщений от лица пользователя, чтобы не сломать шаблон инструкции LLM. Сам пользователь его не увидит, но в БД оно будет сохранено.
 TEMPERATURE = float(os.getenv("TEMPERATURE", 0.7))
 MIN_P = float(os.getenv("MIN_P", 0.1))
 TOP_P = float(os.getenv("TOP_P", 0.9))
@@ -44,8 +42,7 @@ TOKENIZER_ENDPOINT = os.getenv("TOKENIZER_ENDPOINT", "")  # HTTP для токе
 EMBEDDER_ENDPOINT = os.getenv("EMBEDDER_ENDPOINT", "")  # HTTP для векторизации текста
 SUBSCRIBE_CHECK_ENDPOINT = os.getenv("SUBSCRIBE_CHECK_ENDPOINT", "")
 VECTOR_SIZE = 384  # Размерность для all-MiniLM-L6-v2
-# Асинхронное подключение к MySQL
-db_config = {
+DB_CONFIG = {
     "host": os.getenv("MYSQL_HOST", "localhost"),
     "user": os.getenv("MYSQL_USER", "root"),
     "password": os.getenv("MYSQL_PASSWORD", ""),
@@ -57,9 +54,7 @@ def print_config():
     """Функция для вывода текущих настроек конфигурации."""
     logging.info(f"Настройки бота:\n"
                  f"RUNPOD_ENDPOINT: {RUNPOD_ENDPOINT}\n"
-                 f"CONTEXT_LENGTH: {CONTEXT_LENGTH}\n"
                  f"CONTEXT_TOKEN_LIMIT: {CONTEXT_TOKEN_LIMIT}\n"
-                 f"CHARACTER_CARD: {CHARACTER_CARD}\n"
                  f"SYSTEM_PROMPT: {SYSTEM_PROMPT}\n"
                  f"TEMPERATURE: {TEMPERATURE}\n"
                  f"MIN_P: {MIN_P}\n"

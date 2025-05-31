@@ -70,6 +70,42 @@ create index invited_by
 	on users (invited_by);
 	
 alter table messages add column token_count int default 0 null;
+
+alter table messages add column summarized tinyint(1) default 0 null;
+
+create index idx_messages_dialogue_time_summarized
+	on messages (dialogue_id, time, summarized);
+	
+alter table dialogues add column summary text null;
+
+create table if not exists characters
+(
+	id int auto_increment
+		primary key,
+	name varchar(255) not null,
+	card text not null,
+	first_message text not null,
+	user_first_message text not null,
+	first_summary text not null
+);
+
+alter table dialogues add column character_id int null;
+
+create table if not exists summaries
+(
+    id int auto_increment primary key,
+    dialogue_id int not null,
+    summary text not null
+);
+
+    create index idx_summaries_dialogue_id 
+        on summaries (dialogue_id);
+        
+alter table users add column additional_individual_limit int default 0 null;
+
+alter table summaries add column token_count int default 0 null;
+
+UPDATE messages SET summarized = 1 WHERE time < "2025-05-31 17:35:00";
     """
     # Разбиваем запросы на отдельные команды
     for query in queries.strip().split(';'):
