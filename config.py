@@ -16,7 +16,7 @@ if env_path.exists():
 BOT_NAME = os.getenv("BOT_NAME", "nika_ai_chatbot")
 RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT", "")
 CONTEXT_TOKEN_LIMIT = int(
-    os.getenv("CONTEXT_TOKEN_LIMIT", 2000))  # Ставим чуть меньше, чем 4096, чтобы учесть неточность подсчета токенов
+    os.getenv("CONTEXT_TOKEN_LIMIT", 3000))  # Ставим чуть меньше, чем 4096, чтобы учесть неточность подсчета токенов
 SUMMARIZE_BUFFER_PERCENT = int(os.getenv("SUMMARIZE_BUFFER_PERCENT", 30))
 SUMMARIZE_TARGET_TOKEN_LENGTH = int(os.getenv("SUMMARIZE_TARGET_TOKEN_LENGTH", 250))  # Количество токенов для пересказа
 SUMMARIZE_TEMPERATURE = float(os.getenv("SUMMARIZE_TEMPERATURE", 0.3))  # Температура для пересказа
