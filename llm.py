@@ -73,7 +73,7 @@ async def _make_new_summary(previous_summary, chat_id, message_history, characte
     )
     # Сохраняем пересказ в БД
     await summarize.write_summary_to_db(chat_id, summary)
-    # Помечаем сообщения как пересказанные
+    # Помечаем сообщения в БД как пересказанные
     await summarize.mark_messages_as_summarized(history_to_summarize)
     return summary, history_without_summarized
 
