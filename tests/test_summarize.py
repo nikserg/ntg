@@ -90,3 +90,42 @@ async def test_count_tokens_in_messages(monkeypatch):
 
     total_tokens = await summarize._count_tokens_in_messages(messages)
     assert total_tokens == 35
+
+
+@pytest.mark.asyncio
+async def test_get_summarize_buffer(monkeypatch):
+    messages = [
+        {"id": 1, "message": "a", "token_count": 5},
+        {"id": 2, "message": "b", "token_count": 10},
+        {"id": 3, "message": "c", "token_count": 20},
+        {"id": 4, "message": "d", "token_count": 15},
+        {"id": 5, "message": "e", "token_count": 25}
+    ]
+
+    # Mock CONTEXT_TOKEN_LIMIT and SUMMARIZE_BUFFER_PERCENT
+    monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 100)
+    monkeypatch.setattr(summarize, "SUMMARIZE_BUFFER_PERCENT", 30)
+
+    messages_to_summarize, messages_without_summarize = await summarize.get_summarize_buffer(messages)
+    assert messages_to_summarize == [
+        {"id": 1, "message": "a", "token_count": 5},
+        {"id": 2, "message": "b", "token_count": 10},
+        {"id": 3, "message": "c", "token_count": 20}
+    ]
+    assert messages_without_summarize == [
+        {"id": 4, "message": "d", "token_count": 15},
+        {"id": 5, "message": "e", "token_count": 25}
+    ]
+
+    monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 100)
+    monkeypatch.setattr(summarize, "SUMMARIZE_BUFFER_PERCENT", 50)
+    messages_to_summarize, messages_without_summarize = await summarize.get_summarize_buffer(messages)
+    assert messages_to_summarize == [
+        {"id": 1, "message": "a", "token_count": 5},
+        {"id": 2, "message": "b", "token_count": 10},
+        {"id": 3, "message": "c", "token_count": 20},
+        {"id": 4, "message": "d", "token_count": 15}
+    ]
+    assert messages_without_summarize == [
+        {"id": 5, "message": "e", "token_count": 25}
+    ]

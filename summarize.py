@@ -83,6 +83,7 @@ async def mark_messages_as_summarized(messages):
     """
     try:
         message_ids = [msg["id"] for msg in messages]
+        logging.info(f"Помечаем как добавленные в пересказ следующие сообщения: {message_ids}")
         placeholders = ', '.join(['%s'] * len(message_ids))
         query = f"UPDATE messages SET summarized = 1 WHERE id IN ({placeholders})"
         await execute_query(query, message_ids)
