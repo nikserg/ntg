@@ -16,7 +16,7 @@ if env_path.exists():
 BOT_NAME = os.getenv("BOT_NAME", "nika_ai_chatbot")
 RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT", "")
 CONTEXT_TOKEN_LIMIT = int(
-    os.getenv("CONTEXT_TOKEN_LIMIT", 3000))  # Ставим чуть меньше, чем 4096, чтобы учесть неточность подсчета токенов
+    os.getenv("CONTEXT_TOKEN_LIMIT", 2500))  # Ставим чуть меньше, чем 4096, чтобы учесть неточность подсчета токенов
 SUMMARIZE_BUFFER_PERCENT = int(os.getenv("SUMMARIZE_BUFFER_PERCENT", 20))
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT",
