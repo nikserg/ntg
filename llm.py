@@ -51,7 +51,7 @@ async def _build_messages(chat_id, user_input):
 
 async def _make_new_summary(previous_summary, chat_id, message_history, character_name):
     # Сообщения из буфера для пересказа объединяем в одно сообщение
-    history_to_summarize = summarize.get_summarize_buffer(message_history)
+    history_to_summarize, history_without_summarized = summarize.get_summarize_buffer(message_history)
     user_message = _collapse_history_to_single_message(history_to_summarize, previous_summary, character_name)
     summarize_messages_request = _make_messages_with_system_prompt(None, [{"role": "user", "message": user_message}])
     # Запрос к LLM для пересказа
@@ -64,22 +64,18 @@ async def _make_new_summary(previous_summary, chat_id, message_history, characte
 
     logging.info(
         (f"История сообщений для чата {chat_id} обрезана. "
-         "Сообщений для пересказа {len(history_to_summarize)}. "
-         "Температура {SUMMARIZE_TEMPERATURE}. "
-         "Токены {SUMMARIZE_TARGET_TOKEN_LENGTH}.\n"
-         "Запрос: {summarize_messages_request}.\n"
-         "Ответ LLM: {summary}"
+         f"Сообщений для пересказа {len(history_to_summarize)}. "
+         f"Температура {SUMMARIZE_TEMPERATURE}. "
+         f"Токены {SUMMARIZE_TARGET_TOKEN_LENGTH}.\n"
+         f"Запрос: {summarize_messages_request}.\n"
+         f"Ответ LLM: {summary}"
          )
     )
     # Сохраняем пересказ в БД
     await summarize.write_summary_to_db(chat_id, summary)
     # Помечаем сообщения как пересказанные
     await summarize.mark_messages_as_summarized(history_to_summarize)
-    # Убираем пересказанные сообщения из истории
-    for msg in history_to_summarize:
-        if msg in message_history:
-            message_history.remove(msg)
-    return summary, message_history
+    return summary, history_without_summarized
 
 
 def _collapse_history_to_single_message(messages, previous_summary, character_name):

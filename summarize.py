@@ -17,7 +17,9 @@ def get_summarize_buffer(messages):
     messages_count_to_summarize = int(len(messages) * (SUMMARIZE_BUFFER_PERCENT / 100))
     # Получаем самые старые сообщения для пересказа
     messages_to_summarize = messages[:messages_count_to_summarize]
-    return messages_to_summarize
+    # Убираем сообщения, которые вырезаны в буфер
+    messages_without_summarize = messages[messages_count_to_summarize:]
+    return messages_to_summarize, messages_without_summarize
 
 
 async def mark_messages_as_summarized(messages):
