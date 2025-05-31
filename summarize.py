@@ -3,7 +3,7 @@ import logging
 import aiomysql
 
 from characters import get_character
-from config import SUMMARIZE_BUFFER_PERCENT
+from config import SUMMARIZE_BUFFER_PERCENT, CONTEXT_TOKEN_LIMIT
 from db import execute_query, get_db_connection
 from dialogues import get_current_dialogue
 from tokenizer import count_tokens
@@ -11,15 +11,21 @@ from tokenizer import count_tokens
 
 def get_summarize_buffer(messages):
     """
-    Рассчитывает буфер для пересказа сообщений.
-    Используется для определения, сколько сообщений нужно пересказать,
-    чтобы не превысить лимит токенов.
+    Разделяет сообщения на те, которые нужно пересказать, и те, которые останутся без пересказа.
     """
-    messages_count_to_summarize = int(len(messages) * (SUMMARIZE_BUFFER_PERCENT / 100))
-    # Получаем самые старые сообщения для пересказа
-    messages_to_summarize = messages[:messages_count_to_summarize]
-    # Убираем сообщения, которые вырезаны в буфер
-    messages_without_summarize = messages[messages_count_to_summarize:]
+    tokens_to_summarize = CONTEXT_TOKEN_LIMIT * (SUMMARIZE_BUFFER_PERCENT / 100)
+    logging.info(f"tokens_to_summarize: {tokens_to_summarize}")
+    messages_to_summarize = []
+    total_tokens = 0
+    for message in messages:
+        message_tokens = message["token_count"]
+        if message_tokens == 0:
+            message_tokens = count_tokens(message["message"])
+        total_tokens += message_tokens
+        messages_to_summarize.append(message)
+        if total_tokens >= tokens_to_summarize:
+            break
+    messages_without_summarize = messages[len(messages_to_summarize):]
     return messages_to_summarize, messages_without_summarize
 
 
