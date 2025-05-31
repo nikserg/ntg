@@ -36,7 +36,7 @@ async def _build_messages(chat_id, user_input):
     summary = await summarize.get_summary(chat_id)
     if len(history) < len(message_history):
         # Получаем пересказ и обрезанную историю сообщений
-        summary, history = await _make_new_summary(summary, chat_id, message_history)
+        summary, history = await _make_new_summary(summary, chat_id, message_history, character.get("name", ""))
 
     # Находим похожие сообщения из векторной БД
     memories = await find_similar(user_input, chat_id, current_context=[msg["message"] for msg in history])
@@ -48,14 +48,19 @@ async def _build_messages(chat_id, user_input):
     return _make_messages_with_system_prompt(chat_system_prompt, history)
 
 
-async def _make_new_summary(previous_summary, chat_id, message_history):
+async def _make_new_summary(previous_summary, chat_id, message_history, character_name):
     # Системное сообщение для пересказа
-    summary_system_prompt = _get_summary_system_prompt(previous_summary)
-    # Сообщения из буфера для пересказа
+    summary_system_prompt = {
+        "role": "system",
+        "content": f"Кратко перескажи события в этом ролевом диалоге, сохранив имена персонажей, суть происходящего и ключевые моменты истории."
+    }
+    # Сообщения из буфера для пересказа объединяем в одно сообщение
     history_to_summarize = summarize.get_summarize_buffer(message_history)
-    summarize_messages_request = _make_messages_with_system_prompt(summary_system_prompt, history_to_summarize)
+    user_message = _collapse_history_to_single_message(history_to_summarize, previous_summary, character_name)
+    summarize_messages_request = _make_messages_with_system_prompt(summary_system_prompt,
+                                                                   {"role": "user", "message": user_message})
     # Запрос к LLM для пересказа
-    summary = await _llm_request(summarize_messages_request)
+    summary = await _llm_request(summarize_messages_request, max_tokens=400, temperature=0.5)
     logging.info(
         f"История сообщений для чата {chat_id} обрезана с промптом {summary_system_prompt}. Сообщений для пересказа: {len(history_to_summarize)}: {history_to_summarize}. Ответ LLM: {summary}")
     # Сохраняем пересказ в БД
@@ -67,6 +72,19 @@ async def _make_new_summary(previous_summary, chat_id, message_history):
         if msg in message_history:
             message_history.remove(msg)
     return summary, message_history
+
+
+def _collapse_history_to_single_message(messages, previous_summary, character_name):
+    """
+    Формирует диалог в одно большое сообщение для пересказа.
+    """
+    user_message = f"Предыдущие события:\n{previous_summary}\n***\n"
+    for msg in messages:
+        if msg["role"] == "user":
+            user_message += f"Собеседник: {msg['message']}\n"
+        elif msg["role"] == "assistant":
+            user_message += f"{character_name}: {msg['message']}\n"
+    return user_message.strip()
 
 
 def _make_messages_with_system_prompt(system_prompt, chat_messages):
@@ -113,13 +131,6 @@ def _get_reply_system_prompt(memories, character_name, character_card, summary):
         "role": "system",
         "content": f"{SYSTEM_PROMPT}\n***\nТвой персонаж: {character_name}\n{character_card}\n***\nСюжет:\n{summary}" + (
             f"\n***\nПредыдущие сообщения:\n" + "\n".join(memories) if memories else "")
-    }
-
-
-def _get_summary_system_prompt(previous_summary):
-    return {
-        "role": "system",
-        "content": f"Перескажи текущие сообщения в диалоге, сохранив суть и ключевые моменты. Предыдущий пересказ: {previous_summary}"
     }
 
 
