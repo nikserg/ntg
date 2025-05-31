@@ -17,7 +17,11 @@ from tokenizer import count_tokens
 async def run_llm(chat_id, cleaned_input):
     """Получает ответ от LLM на основе входящего сообщения пользователя."""
     messages = await _build_messages(chat_id, cleaned_input)
-    return await _llm_request(messages)
+    try:
+        return await _llm_request(messages)
+    except Exception as e:
+        logging.error(f"Ошибка при запросе к LLM: {e}. messages: {messages}")
+        raise e
 
 
 async def _build_messages(chat_id, user_input):
