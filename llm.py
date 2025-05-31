@@ -77,6 +77,8 @@ async def _make_new_summary(previous_summary, chat_id, message_history, characte
             max_tokens=SUMMARIZE_TARGET_TOKEN_LENGTH,
             temperature=SUMMARIZE_TEMPERATURE
         )
+        # Очищаем ответ от лишних символов
+        summary = _clean_llm_summary(summary)
     except Exception as e:
         logging.error(f"Ошибка при запросе пересказа в LLM: {e}")
         raise e
@@ -135,14 +137,16 @@ def _get_reply_system_prompt(memories, character_name, character_card, summary):
     }
 
 
-def _trim_incomplete_sentence(text):
-    # Находит последнее завершённое предложение
-    match = re.search(r'([.!?…\]*])[^.!?…\]*]*$', text)
-    if match:
-        end = match.end(1)
-        return text[:end].strip()
-    return text.strip()
-
+def _clean_llm_summary(text):
+    # Убираем неоконченные предложения
+    text = _trim_incomplete_sentence(text)
+    # Заменяем переносы строк на пробелы
+    text = re.sub(r'\n+', ' ', text)
+    # Убираем лишние пробелы и переносы строк
+    text = re.sub(r'\s+', ' ', text).strip()
+    # Убираем пробелы в начале и конце
+    text = text.strip()
+    return text
 
 def _clean_llm_response(text):
     """Удаляет нежелательные символы или строки из ответа."""
@@ -181,6 +185,14 @@ def _clean_llm_response(text):
     text = _trim_incomplete_sentence(text)
     return text.strip()
 
+
+def _trim_incomplete_sentence(text):
+    # Находит последнее завершённое предложение
+    match = re.search(r'([.!?…\]*])[^.!?…\]*]*$', text)
+    if match:
+        end = match.end(1)
+        return text[:end].strip()
+    return text.strip()
 
 async def _llm_request(messages, character_name, include_character_name=True, temperature=TEMPERATURE, top_p=TOP_P,
                        min_p=MIN_P, repeat_penalty=REPEAT_PENALTY,
