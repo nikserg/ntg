@@ -58,7 +58,7 @@ async def _make_new_summary(previous_summary, chat_id, message_history, characte
     history_to_summarize = summarize.get_summarize_buffer(message_history)
     user_message = _collapse_history_to_single_message(history_to_summarize, previous_summary, character_name)
     summarize_messages_request = _make_messages_with_system_prompt(summary_system_prompt,
-                                                                   {"role": "user", "message": user_message})
+                                                                   [{"role": "user", "message": user_message}])
     # Запрос к LLM для пересказа
     summary = await _llm_request(summarize_messages_request, max_tokens=400, temperature=0.5)
     logging.info(
