@@ -104,6 +104,8 @@ create table if not exists summaries
 alter table users add column additional_individual_limit int default 0 null;
 
 alter table summaries add column token_count int default 0 null;
+
+UPDATE messages SET summarized = 1 WHERE time < "2025-05-31 17:00:00";
     """
     # Разбиваем запросы на отдельные команды
     for query in queries.strip().split(';'):
