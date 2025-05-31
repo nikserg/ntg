@@ -55,8 +55,13 @@ async def _make_new_summary(previous_summary, chat_id, message_history, characte
     user_message = _collapse_history_to_single_message(history_to_summarize, previous_summary, character_name)
     summarize_messages_request = _make_messages_with_system_prompt(None, [{"role": "user", "message": user_message}])
     # Запрос к LLM для пересказа
-    summary = await _llm_request(summarize_messages_request, max_tokens=SUMMARIZE_TARGET_TOKEN_LENGTH,
-                                 temperature=SUMMARIZE_TEMPERATURE)
+    try:
+        summary = await _llm_request(summarize_messages_request, max_tokens=SUMMARIZE_TARGET_TOKEN_LENGTH,
+                                     temperature=SUMMARIZE_TEMPERATURE)
+    except Exception as e:
+        logging.error(f"Ошибка при запросе пересказа в LLM: {e}")
+        raise e
+
     logging.info(
         (f"История сообщений для чата {chat_id} обрезана. "
          "Сообщений для пересказа {len(history_to_summarize)}. "
