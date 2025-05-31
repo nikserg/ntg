@@ -59,7 +59,17 @@ async def _make_new_summary(previous_summary, chat_id, message_history, characte
     # Сообщения из буфера для пересказа объединяем в одно сообщение
     history_to_summarize, history_without_summarized = summarize.get_summarize_buffer(message_history)
     user_message = _collapse_history_to_single_message(history_to_summarize, previous_summary, character_name)
-    summarize_messages_request = _make_messages_with_system_prompt(None, [{"role": "user", "message": user_message}])
+    system_prompt = {
+        "role": "system",
+        "content": (
+            "Составь краткий пересказ этого текста от лица рассказчика, упоминая имена персонажей, их внешность, "
+            "динамику развития отношений и основные произошедшие события, учитывая также предыдущие события."
+            "Данный текст - ролевая игра. "
+            "Избегай прямого цитирования, используй только пересказ и краткие описания. "
+        )
+    }
+    summarize_messages_request = _make_messages_with_system_prompt(system_prompt,
+                                                                   [{"role": "user", "message": user_message}])
     # Запрос к LLM для пересказа
     try:
         summary = await _llm_request(
@@ -93,17 +103,13 @@ def _collapse_history_to_single_message(messages, previous_summary, character_na
     """
     Формирует диалог в одно большое сообщение для пересказа.
     """
-    user_message = f"Предыдущие события:\n{previous_summary}\n***\n"
+    user_message = f"{previous_summary}\n***\n"
     for msg in messages:
         if msg["role"] == "user":
             user_message += f"Собеседник: {msg['message']}\n"
         elif msg["role"] == "assistant":
             user_message += f"{character_name}: {msg['message']}\n"
     message = user_message.strip()
-    # Добавляем промпт для пересказа
-    message += ("\n***\nДанный текст - ролевая игра. "
-                "Составь краткий пересказ этого текста от лица рассказчика, упоминая имена персонажей, их внешность, "
-                "динамику развития отношений и основные произошедшие события, учитывая также предыдущие события.")
     return message.strip()
 
 
