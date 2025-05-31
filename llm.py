@@ -50,7 +50,7 @@ async def _build_messages(chat_id, user_input):
 
 async def _make_new_summary(previous_summary, chat_id, message_history):
     # Системное сообщение для пересказа
-    summary_system_prompt = summarize.summary_system_prompt(previous_summary)
+    summary_system_prompt = _get_summary_system_prompt(previous_summary)
     # Сообщения из буфера для пересказа
     history_to_summarize = summarize.get_summarize_buffer(message_history)
     summarize_messages_request = _make_messages_with_system_prompt(summary_system_prompt, history_to_summarize)
@@ -113,6 +113,13 @@ def _get_reply_system_prompt(memories, character_name, character_card, summary):
         "role": "system",
         "content": f"{SYSTEM_PROMPT}\n***\nТвой персонаж: {character_name}\n{character_card}\n***\nСюжет:\n{summary}" + (
             f"\n***\nПредыдущие сообщения:\n" + "\n".join(memories) if memories else "")
+    }
+
+
+def _get_summary_system_prompt(previous_summary):
+    return {
+        "role": "system",
+        "content": f"Перескажи текущие сообщения в диалоге, сохранив суть и ключевые моменты. Предыдущий пересказ: {previous_summary}"
     }
 
 

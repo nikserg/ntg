@@ -6,10 +6,6 @@ from db import execute_query, get_db_connection
 from dialogues import get_current_dialogue
 
 
-def summary_system_prompt(previous_summary):
-    return f"Перескажи текущие сообщения в диалоге, сохранив суть и ключевые моменты. Предыдущий пересказ: {previous_summary}"
-
-
 def get_summarize_buffer(messages):
     """
     Рассчитывает буфер для пересказа сообщений.
