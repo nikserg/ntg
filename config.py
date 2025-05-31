@@ -16,10 +16,10 @@ if env_path.exists():
 BOT_NAME = os.getenv("BOT_NAME", "nika_ai_chatbot")
 RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT", "")
 # CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 2500))  # Ставим чуть меньше, чем 4096, чтобы учесть неточность подсчета токенов
-CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 1000))  # Для теста пересказа
+CONTEXT_TOKEN_LIMIT = int(os.getenv("CONTEXT_TOKEN_LIMIT", 1500))  # Для теста пересказа
 SUMMARIZE_BUFFER_PERCENT = int(os.getenv("SUMMARIZE_BUFFER_PERCENT", 20))
 SUMMARIZE_TARGET_TOKEN_LENGTH = int(os.getenv("SUMMARIZE_TARGET_TOKEN_LENGTH", 300))  # Количество токенов для пересказа
-SUMMARIZE_TEMPERATURE = float(os.getenv("SUMMARIZE_TEMPERATURE", 0.4))  # Температура для пересказа
+SUMMARIZE_TEMPERATURE = float(os.getenv("SUMMARIZE_TEMPERATURE", 0.3))  # Температура для пересказа
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
 SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT",
                           "Ты виртуальный помощник, который помогает пользователям с их вопросами и задачами. Дружелюбный и отзывчивый.")
