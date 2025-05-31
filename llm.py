@@ -19,7 +19,8 @@ async def run_llm(chat_id, cleaned_input):
     messages = await _build_messages(chat_id, cleaned_input)
     character_name = await get_character_name(chat_id)
     try:
-        return await _llm_request(messages, character_name=character_name, include_character_name=True)
+        llm_response = _llm_request(messages, character_name=character_name, include_character_name=True)
+        return await _clean_llm_response(llm_response)
     except Exception as e:
         logging.error(f"Ошибка при запросе к LLM: {e}. messages: {messages}")
         raise e
@@ -258,7 +259,7 @@ async def _llm_request(messages, character_name, include_character_name=True, te
                                     if text is None:
                                         logging.error(f"Ответ LLM без текста: {status_data}")
                                         return "[Ой! Кажется, у меня техническая проблема под кодовым именем Клубничка]"
-                                    return _clean_llm_response(text)
+                                    return text
 
                                 elif status == "FAILED":
                                     logging.info(f"Задача завершилась с ошибкой: {status_data}")
@@ -275,7 +276,7 @@ async def _llm_request(messages, character_name, include_character_name=True, te
                     if text is None:
                         logging.error(f"Ответ LLM без текста: {data}")
                         return "[Ой! Кажется, у меня техническая проблема под кодовым именем Клубничка]"
-                    return _clean_llm_response(text)
+                    return text
         except Exception as e:
             logging.error(f"Ошибка при обращении к RunPod (попытка {attempt}): {e}")
             if attempt == retries:
