@@ -7,11 +7,10 @@ import aiohttp
 import summarize
 from characters import get_character, get_character_name
 from config import RUNPOD_API_KEY, RUNPOD_ENDPOINT, SYSTEM_PROMPT, \
-    TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, CONTEXT_TOKEN_LIMIT, \
+    TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, \
     SUMMARIZE_TARGET_TOKEN_LENGTH, SUMMARIZE_TEMPERATURE
 from messages import get_current_messages
 from qdrant import find_similar
-from tokenizer import count_tokens
 
 
 async def run_llm(chat_id, cleaned_input):
@@ -30,20 +29,17 @@ async def _build_messages(chat_id, user_input):
     """
     Формирует список сообщений для LLM из истории чата, векторной БД и системного промпта.
     """
-    # Получаем историю чата из MySQL
-    message_history = await get_current_messages(chat_id)
-
     # Получаем персонажа
     character = await get_character(chat_id)
 
-    # История сообщений, которая помещается в наш лимит
-    history = await _truncate_history(message_history, CONTEXT_TOKEN_LIMIT)
+    # Получаем историю чата из MySQL
+    history = await get_current_messages(chat_id)
 
     # Если сообщения начинают обрезаться, делаем пересказ
     summary = await summarize.get_summary(chat_id)
-    if len(history) < len(message_history):
+    if await summarize.needs_summarization(history):
         # Получаем пересказ и обрезанную историю сообщений
-        summary, history = await _make_new_summary(summary, chat_id, message_history, character.get("name", ""))
+        summary, history = await _make_new_summary(summary, chat_id, history, character.get("name", ""))
 
     # Находим похожие сообщения из векторной БД
     memories = await find_similar(user_input, chat_id, current_context=[msg["message"] for msg in history])
@@ -56,8 +52,11 @@ async def _build_messages(chat_id, user_input):
 
 
 async def _make_new_summary(previous_summary, chat_id, message_history, character_name):
+    # Если сообщений для пересказа слишком много (после запуска новой системы), обрезаем историю
+    message_history = await summarize.truncate_history(message_history)
+
     # Сообщения из буфера для пересказа объединяем в одно сообщение
-    history_to_summarize, history_without_summarized = summarize.get_summarize_buffer(message_history)
+    history_to_summarize, history_without_summarized = await summarize.get_summarize_buffer(message_history)
     user_message = _collapse_history_to_single_message(history_to_summarize, previous_summary, character_name)
     system_prompt = {
         "role": "system",
@@ -125,32 +124,6 @@ def _make_messages_with_system_prompt(system_prompt, chat_messages):
             messages.append({"role": "user", "content": msg["message"]})
 
     return messages
-
-
-async def _truncate_history(messages, max_tokens):
-    """
-    Обрезает историю сообщений, чтобы оставить максимальное
-    количество последних сообщений в рамках max_tokens.
-    """
-    if not messages:
-        return []
-
-    # Подсчёт токенов для каждого сообщения
-    total_tokens = 0
-    truncated = []
-
-    for msg in reversed(messages):
-        msg_tokens = msg["token_count"]
-        if msg_tokens is None or msg_tokens <= 0:
-            # Если токены не посчитаны, используем функцию для подсчёта
-            msg_tokens = await count_tokens(msg["message"])
-
-        if total_tokens + msg_tokens > max_tokens:
-            break
-        truncated.insert(0, msg)
-        total_tokens += msg_tokens
-
-    return truncated
 
 
 def _get_reply_system_prompt(memories, character_name, character_card, summary):

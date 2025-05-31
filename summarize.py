@@ -9,7 +9,7 @@ from dialogues import get_current_dialogue
 from tokenizer import count_tokens
 
 
-def get_summarize_buffer(messages):
+async def get_summarize_buffer(messages):
     """
     Разделяет сообщения на те, которые нужно пересказать, и те, которые останутся без пересказа.
     """
@@ -20,13 +20,61 @@ def get_summarize_buffer(messages):
     for message in messages:
         message_tokens = message["token_count"]
         if message_tokens == 0:
-            message_tokens = count_tokens(message["message"])
+            message_tokens = await count_tokens(message["message"])
         total_tokens += message_tokens
         messages_to_summarize.append(message)
         if total_tokens >= tokens_to_summarize:
             break
     messages_without_summarize = messages[len(messages_to_summarize):]
     return messages_to_summarize, messages_without_summarize
+
+
+async def needs_summarization(messages):
+    """
+    Проверяет, нужно ли пересказывать сообщения.
+    Возвращает True, если количество токенов в сообщениях превышает лимит контекста.
+    """
+    total_tokens = await _count_tokens_in_messages(messages)
+    return total_tokens > CONTEXT_TOKEN_LIMIT
+
+
+async def truncate_history(messages):
+    """
+    Обрезает историю сообщений, чтобы оставить максимальное
+    количество последних сообщений в рамках max_tokens.
+    """
+    if not messages:
+        return []
+
+    # Подсчёт токенов для каждого сообщения
+    total_tokens = 0
+    truncated = []
+
+    for msg in reversed(messages):
+        msg_tokens = msg["token_count"]
+        if msg_tokens is None or msg_tokens <= 0:
+            # Если токены не посчитаны, используем функцию для подсчёта
+            msg_tokens = await count_tokens(msg["message"])
+
+        if total_tokens + msg_tokens > CONTEXT_TOKEN_LIMIT:
+            break
+        truncated.insert(0, msg)
+        total_tokens += msg_tokens
+
+    return truncated
+
+
+async def _count_tokens_in_messages(messages):
+    """
+    Считает общее количество токенов в списке сообщений.
+    """
+    total_tokens = 0
+    for message in messages:
+        message_tokens = message["token_count"]
+        if message_tokens == 0:
+            message_tokens = await count_tokens(message["message"])
+        total_tokens += message_tokens
+    return total_tokens
 
 
 async def mark_messages_as_summarized(messages):
