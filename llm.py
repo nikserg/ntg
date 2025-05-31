@@ -20,7 +20,7 @@ async def run_llm(chat_id, cleaned_input):
         messages = await _build_messages(chat_id, cleaned_input)
         character_name = await get_character_name(chat_id)
         llm_response = await _llm_request(messages, character_name=character_name, include_character_name=True)
-        return await _clean_llm_response(llm_response)
+        return _clean_llm_response(llm_response)
     except Exception as e:
         logging.error(f"Ошибка при запросе к LLM: {e}.")
         raise e
