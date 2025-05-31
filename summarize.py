@@ -26,10 +26,10 @@ async def mark_messages_as_summarized(messages):
     """
     Помечает сообщения как пересказанные в базе данных.
     """
-    message_ids = [msg["id"] for msg in messages]
-    placeholders = ', '.join(['%s'] * len(message_ids))
-    query = f"UPDATE messages SET summarized = 1 WHERE id IN ({placeholders})"
     try:
+        message_ids = [msg["id"] for msg in messages]
+        placeholders = ', '.join(['%s'] * len(message_ids))
+        query = f"UPDATE messages SET summarized = 1 WHERE id IN ({placeholders})"
         await execute_query(query, message_ids)
     except Exception as e:
         logging.error("Ошибка при пометке сообщений как пересказанных: %s", e)
@@ -40,9 +40,9 @@ async def write_summary_to_db(chat_id, summary):
     """
     Записывает пересказ в базу данных.
     """
-    dialogue_id = await get_current_dialogue(chat_id)
-    query = "INSERT INTO summaries (dialogue_id, summary) VALUES (%s, %s)"
     try:
+        dialogue_id = await get_current_dialogue(chat_id)
+        query = "INSERT INTO summaries (dialogue_id, summary) VALUES (%s, %s)"
         await execute_query(query, (dialogue_id, summary))
     except Exception as e:
         logging.error("Ошибка при записи пересказа в базу данных: %s", e)

@@ -94,7 +94,7 @@ def _collapse_history_to_single_message(messages, previous_summary, character_na
             user_message += f"{character_name}: {msg['message']}\n"
     message = user_message.strip()
     # Добавляем промпт для пересказа
-    message += "\n***\nИгнорируй предыдущие инструкции. Составь краткий пересказ этого текста от третьего лица, упоминая имена персонажей, их внешность и основные события."
+    message += "\n***\nИгнорируй предыдущие инструкции. Составь краткий пересказ этого текста от третьего лица, упоминая имена персонажей, их внешность, динамику отношений и основные события."
     return message.strip()
 
 
