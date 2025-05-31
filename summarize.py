@@ -38,7 +38,11 @@ async def needs_summarization(messages):
     return total_tokens > CONTEXT_TOKEN_LIMIT
 
 
-async def truncate_history(messages):
+async def truncate_history_overflow(messages):
+    return await _truncate_history(messages, context_token_limit=CONTEXT_TOKEN_LIMIT * 1.5)
+
+
+async def _truncate_history(messages, context_token_limit=CONTEXT_TOKEN_LIMIT):
     """
     Обрезает историю сообщений, чтобы оставить максимальное
     количество последних сообщений в рамках max_tokens.
@@ -56,7 +60,7 @@ async def truncate_history(messages):
             # Если токены не посчитаны, используем функцию для подсчёта
             msg_tokens = await count_tokens(msg["message"])
 
-        if total_tokens + msg_tokens > CONTEXT_TOKEN_LIMIT:
+        if total_tokens + msg_tokens > context_token_limit:
             break
         truncated.insert(0, msg)
         total_tokens += msg_tokens
@@ -77,19 +81,16 @@ async def _count_tokens_in_messages(messages):
     return total_tokens
 
 
-async def mark_messages_as_summarized(messages):
+async def mark_messages_as_summarized(chat_id, messages):
     """
     Помечает сообщения как пересказанные в базе данных.
     """
-    try:
-        message_ids = [msg["id"] for msg in messages]
-        logging.info(f"Помечаем как добавленные в пересказ следующие сообщения: {message_ids}")
-        placeholders = ', '.join(['%s'] * len(message_ids))
-        query = f"UPDATE messages SET summarized = 1 WHERE id IN ({placeholders})"
-        await execute_query(query, message_ids)
-    except Exception as e:
-        logging.error("Ошибка при пометке сообщений как пересказанных: %s", e)
-        raise e
+    # Получаем самое новое пересказанное сообщение (с наибольшим id)
+    max_id = max(msg["id"] for msg in messages)
+    logging.info(f"Максимальный ID сообщения для пометки как пересказанное: {max_id}")
+    dialogue_id = await get_current_dialogue(chat_id)
+    query = f"UPDATE messages SET summarized = 1 WHERE dialogue_id = %s AND id <= %s"
+    await execute_query(query, (dialogue_id, max_id))
 
 
 async def write_summary_to_db(chat_id, summary):

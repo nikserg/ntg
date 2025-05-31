@@ -21,19 +21,19 @@ async def test_truncate_history(monkeypatch):
     with aioresponses() as m:
         # Mock CONTEXT_TOKEN_LIMIT to a specific value
         monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 100)
-        result = await summarize.truncate_history(messages)
+        result = await summarize._truncate_history(messages)
         assert result == messages
 
         monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 31)
-        result = await summarize.truncate_history(messages)
+        result = await summarize._truncate_history(messages)
         assert result == [{"message": "b" * 10, "token_count": 10}, {"message": "c" * 20, "token_count": 20}]
 
         monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 20)
-        result = await summarize.truncate_history(messages)
+        result = await summarize._truncate_history(messages)
         assert result == [{"message": "c" * 20, "token_count": 20}]
 
         monkeypatch.setattr(summarize, "CONTEXT_TOKEN_LIMIT", 19)
-        result = await summarize.truncate_history(messages)
+        result = await summarize._truncate_history(messages)
         assert result == []
 
 

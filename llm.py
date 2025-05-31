@@ -52,12 +52,14 @@ async def _build_messages(chat_id, user_input):
 
 
 async def _make_new_summary(previous_summary, chat_id, message_history, character_name):
-    # Если сообщений для пересказа слишком много (после запуска новой системы), обрезаем историю
 
     # Выводим ID сообщений, которые будут пересказаны
     logging.info(f"Создание пересказа для {chat_id}: {[msg['id'] for msg in message_history]}")
 
-    message_history = await summarize.truncate_history(message_history)
+    # Если сообщений для пересказа слишком много (после запуска новой системы), обрезаем историю
+    # Увеличиваем лимит контекста, чтобы туда поместились граничные сообщения, которые могут выпасть из
+    # контекста, особенно при первом пересказе
+    message_history = await summarize.truncate_history_overflow(message_history)
     logging.info(f"История для пересказа {chat_id} после обрезания: {[msg['id'] for msg in message_history]}")
 
     # Сообщения из буфера для пересказа объединяем в одно сообщение
@@ -103,7 +105,7 @@ async def _make_new_summary(previous_summary, chat_id, message_history, characte
     # Сохраняем пересказ в БД
     await summarize.write_summary_to_db(chat_id, summary)
     # Помечаем сообщения в БД как пересказанные
-    await summarize.mark_messages_as_summarized(history_to_summarize)
+    await summarize.mark_messages_as_summarized(chat_id, history_to_summarize)
     return summary, history_without_summarized
 
 

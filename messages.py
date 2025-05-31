@@ -26,7 +26,7 @@ async def get_current_messages(chat_id):
             WHERE dialogues.chat_id = %s
               AND dialogues.is_current = TRUE
               AND messages.summarized = 0 
-            ORDER BY messages.time ASC \
+            ORDER BY messages.id ASC \
             """
     async with (await get_db_connection()) as conn:
         async with conn.cursor(aiomysql.DictCursor) as cursor:
