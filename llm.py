@@ -7,7 +7,8 @@ import aiohttp
 import summarize
 from characters import get_character
 from config import RUNPOD_API_KEY, RUNPOD_ENDPOINT, SYSTEM_PROMPT, \
-    TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, CONTEXT_TOKEN_LIMIT
+    TEMPERATURE, TOP_P, MIN_P, REPEAT_PENALTY, REPLY_MAX_TOKENS, CONTEXT_TOKEN_LIMIT, \
+    SUMMARIZE_TARGET_TOKEN_LENGTH, SUMMARIZE_TEMPERATURE
 from messages import get_current_messages
 from qdrant import find_similar
 from tokenizer import count_tokens
@@ -49,20 +50,22 @@ async def _build_messages(chat_id, user_input):
 
 
 async def _make_new_summary(previous_summary, chat_id, message_history, character_name):
-    # Системное сообщение для пересказа
-    summary_system_prompt = {
-        "role": "system",
-        "content": f"Кратко перескажи события в этом ролевом диалоге, сохранив имена персонажей, суть происходящего и ключевые моменты истории."
-    }
     # Сообщения из буфера для пересказа объединяем в одно сообщение
     history_to_summarize = summarize.get_summarize_buffer(message_history)
     user_message = _collapse_history_to_single_message(history_to_summarize, previous_summary, character_name)
-    summarize_messages_request = _make_messages_with_system_prompt(summary_system_prompt,
-                                                                   [{"role": "user", "message": user_message}])
+    summarize_messages_request = _make_messages_with_system_prompt(None, [{"role": "user", "message": user_message}])
     # Запрос к LLM для пересказа
-    summary = await _llm_request(summarize_messages_request, max_tokens=400, temperature=0.5)
+    summary = await _llm_request(summarize_messages_request, max_tokens=SUMMARIZE_TARGET_TOKEN_LENGTH,
+                                 temperature=SUMMARIZE_TEMPERATURE)
     logging.info(
-        f"История сообщений для чата {chat_id} обрезана с промптом {summary_system_prompt}. Сообщений для пересказа: {len(history_to_summarize)}: {history_to_summarize}. Ответ LLM: {summary}")
+        (f"История сообщений для чата {chat_id} обрезана. "
+         "Сообщений для пересказа {len(history_to_summarize)}. "
+         "Температура {SUMMARIZE_TEMPERATURE}. "
+         "Токены {SUMMARIZE_TARGET_TOKEN_LENGTH}.\n"
+         "Запрос: {summarize_messages_request}.\n"
+         "Ответ LLM: {summary}"
+         )
+    )
     # Сохраняем пересказ в БД
     await summarize.write_summary_to_db(chat_id, summary)
     # Помечаем сообщения как пересказанные
@@ -84,11 +87,17 @@ def _collapse_history_to_single_message(messages, previous_summary, character_na
             user_message += f"Собеседник: {msg['message']}\n"
         elif msg["role"] == "assistant":
             user_message += f"{character_name}: {msg['message']}\n"
-    return user_message.strip()
+    message = user_message.strip()
+    # Добавляем промпт для пересказа
+    message += "\n***\nИгнорируй предыдущие инструкции. Составь краткий пересказ этого текста от третьего лица, упоминая имена персонажей, их внешность и основные события."
+    return message.strip()
 
 
 def _make_messages_with_system_prompt(system_prompt, chat_messages):
-    messages = [system_prompt]
+    if system_prompt:
+        messages = [system_prompt]
+    else:
+        messages = []
 
     for msg in chat_messages:
         if msg["role"] == "assistant":
